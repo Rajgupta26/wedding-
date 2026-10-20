@@ -5,6 +5,7 @@
   const LAST_SRC = SRC[SRC.length - 1];
   const $ = (s) => document.querySelector(s);
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const touch = matchMedia("(hover: none) and (pointer: coarse)").matches;   // phones/tablets: lighter effects
 
   const intro = $("#home"), stage = $("#stage"), frameEl = $("#frame");
   const canvas = $("#introCanvas"), ctx = canvas.getContext("2d");
@@ -64,8 +65,11 @@
     invalidate();
     if (essentialLeft <= 0) ready();
   }
-  loadImg("assets/intro/end.webp").then((im) => { endImg = im; progressed(true); });
-  order.forEach((i) => loadImg("assets/intro/" + FR[i][0]).then((im) => { imgs[i] = im; progressed(essential.has(i)); }));
+  // phones get a lighter frame set (540x1000): ~40% less to download and to keep decoded in memory
+  const BASE = touch ? "assets/intro-m/" : "assets/intro/";
+  if (touch) { canvas.width = 540; canvas.height = 1000; }
+  loadImg(BASE + "end.webp").then((im) => { endImg = im; progressed(true); });
+  order.forEach((i) => loadImg(BASE + FR[i][0]).then((im) => { imgs[i] = im; progressed(essential.has(i)); }));
 
   let isReady = false;
   function ready() {
@@ -131,7 +135,7 @@
       l.t = t;
       const e = t * t * (3 - 2 * t);
       l.el.style.opacity = e.toFixed(3);
-      l.el.style.filter = e >= 1 ? "none" : `blur(${((1 - e) * blurMax).toFixed(2)}px)`;
+      if (!touch) l.el.style.filter = e >= 1 ? "none" : `blur(${((1 - e) * blurMax).toFixed(2)}px)`;
     }
   }
 
@@ -222,7 +226,7 @@
     } else {
       const d = target - smooth;
       if (Math.abs(d) > 0.0002 || dirty) {
-        smooth = reduce || Math.abs(d) < 0.0002 ? target : smooth + d * 0.2;
+        smooth = reduce || touch || Math.abs(d) < 0.0002 ? target : smooth + d * 0.2;   // touch scrolling is already smooth
         render(smooth);
       }
     }

@@ -654,6 +654,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .countdown b { font-size: 23px; }
 }
 
+/* Phones & tablets: same fades and movement, but no animated blur / glow (they are what make phones stutter) */
+@media (hover: none) and (pointer: coarse) {
+  [data-reveal] { filter: none; transition: opacity 1s ease var(--d, 0s), transform 1.1s var(--ease-out) var(--d, 0s); }
+  .sec [data-letters] .ltr { filter: none; transition: opacity .9s ease var(--ld, 0s); }
+  .bfly { filter: none; }
+  .btn--glow { animation: none; box-shadow: 0 0 0 4px rgba(255, 236, 210, .35); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-reveal], .sec [data-letters] .ltr { transition: none; opacity: 1; transform: none; filter: none; }
   .medallion::before, .loader__mono, .btn--glow, .intro__next i { animation: none; }
