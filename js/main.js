@@ -154,6 +154,15 @@
   const FADE = 0.15, HOLD = 0.5, XFADE = 0.18;   // lengths in screens of scrolling
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
   const smooth = (v) => v * v * (3 - 2 * v);
+  function addStop(parent, t) {                                 // t = screens from the top of parent
+    const s = el("i", "snap");
+    s.setAttribute("aria-hidden", "true");
+    s.style.setProperty("--t", t.toFixed(3));
+    parent.append(s);
+  }
+  // the opening plays in steps: closed curtains, curtains open, mandap complete, full title
+  // (its reveal spans 4 screens; intro.js maps that to progress 0 → 1)
+  [0, 0.4, 0.72, 1].forEach((p) => addStop($("#home"), p * 4));
   document.documentElement.style.setProperty("--ov", FADE);      // CSS overlap between consecutive pages
   const scenes = $$(".sec").map((sec, idx, all) => {
     const pin = el("div", "sec__pin"), inner = el("div", "sec__inner");
@@ -175,6 +184,8 @@
     const in0 = idx === 0 ? 0.3 : 0, inl = idx === 0 ? 0.35 : FADE;
     const R = in0 + inl + n * HOLD + (n - 1) * XFADE + (last ? 0 : FADE);
     sec.style.setProperty("--len", (R + 1).toFixed(3));
+    // a stop where the page — or each event card — is fully shown and resting
+    for (let i = 0; i < n; i++) addStop(sec, in0 + inl + i * (HOLD + XFADE) + HOLD / 2);
     return {
       idx, sec, pin, inner, steps, dots, n, last, R, in0, inl, fit: 1, shown: false, key: "", vis: 0, best: 0, ty: 0, docTop: 0,
       reveals: $$("[data-reveal], [data-letters], [data-draw]", inner),

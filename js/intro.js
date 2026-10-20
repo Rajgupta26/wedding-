@@ -235,7 +235,7 @@
       const p = lerpKeys(AUTOPLAY, auto.from + t);
       window.scrollTo(0, introTop + p * range);
       target = smooth = p;
-      if (auto.from + t >= AUTOPLAY[AUTOPLAY.length - 1][0]) auto = null;
+      if (auto.from + t >= AUTOPLAY[AUTOPLAY.length - 1][0]) cancelAuto();
       render(smooth);
     } else {
       const d = target - smooth;
@@ -258,9 +258,13 @@
       from = t1;
     }
     auto = { t0: performance.now(), from };
+    document.documentElement.classList.add("free-scroll");      // let the autoplay scroll smoothly between stops
     kick();
   }
-  const cancelAuto = () => { auto = null; };
+  function cancelAuto() {
+    auto = null;
+    document.documentElement.classList.remove("free-scroll");
+  }
   $("#openBtn").addEventListener("click", startAuto);
   ["wheel", "touchstart", "keydown", "mousedown"].forEach((ev) =>
     addEventListener(ev, (e) => { if (auto && !(ev === "mousedown" && e.target.closest("#openBtn"))) cancelAuto(); }, { passive: true })

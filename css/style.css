@@ -23,7 +23,25 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* every swipe stops at the next page / step, however hard you flick */
+  scroll-snap-type: y mandatory;
+}
+html.free-scroll { scroll-snap-type: none; }   /* while "Open Invitation" plays the opening */
+
+/* invisible stops, placed by script at the moment each page (or step) is fully shown */
+.snap {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  top: calc(var(--t) * 100vh);
+  top: calc(var(--t) * 100lvh);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  pointer-events: none;
+}
 
 body {
   margin: 0;
