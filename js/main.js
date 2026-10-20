@@ -154,6 +154,7 @@
   const FADE = 0.15, HOLD = 0.5, XFADE = 0.18;   // lengths in screens of scrolling
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
   const smooth = (v) => v * v * (3 - 2 * v);
+  document.documentElement.style.setProperty("--ov", FADE);      // CSS overlap between consecutive pages
   const scenes = $$(".sec").map((sec, idx, all) => {
     const pin = el("div", "sec__pin"), inner = el("div", "sec__inner");
     inner.append(...sec.childNodes);
@@ -170,10 +171,12 @@
     }
     const n = Math.max(1, steps.length);
     const last = idx === all.length - 1;
-    const R = FADE + n * HOLD + (n - 1) * XFADE + (last ? 0 : FADE);
+    // the first page appears while the card dissolves in over the opening scene (screens 0.3–0.65 of the hand-off)
+    const in0 = idx === 0 ? 0.3 : 0, inl = idx === 0 ? 0.35 : FADE;
+    const R = in0 + inl + n * HOLD + (n - 1) * XFADE + (last ? 0 : FADE);
     sec.style.setProperty("--len", (R + 1).toFixed(3));
     return {
-      idx, sec, pin, inner, steps, dots, n, last, R, fit: 1, shown: false, key: "", vis: 0, best: 0, ty: 0, docTop: 0,
+      idx, sec, pin, inner, steps, dots, n, last, R, in0, inl, fit: 1, shown: false, key: "", vis: 0, best: 0, ty: 0, docTop: 0,
       reveals: $$("[data-reveal], [data-letters], [data-draw]", inner),
     };
   });
@@ -181,6 +184,9 @@
   const card = $("#card");
   const fitEl = $("#cardFit");
   const flTL = $("#flTL"), flBR = $("#flBR");
+  const cardLayers = [$(".card__bg"), $(".card__flowers"), $("#flutter")];
+  const introEl = $("#home");
+  let introTop = 0, lastVeil = -1, stageFly = null;
   // one "screen" of scrolling = 100lvh, which stays put while mobile toolbars slide in and out
   const probe = el("div");
   probe.style.cssText = "position:absolute;left:0;top:0;width:1px;height:100vh;height:100lvh;visibility:hidden;pointer-events:none";
@@ -194,6 +200,7 @@
   function measure() {
     unit = probe.offsetHeight || innerHeight;
     cardTop = card.getBoundingClientRect().top + scrollY;
+    introTop = introEl.getBoundingClientRect().top + scrollY;
     cardH = card.offsetHeight;
     scenes.forEach((sc) => {
       sc.docTop = sc.sec.getBoundingClientRect().top + scrollY;
@@ -258,7 +265,11 @@
         sc.vis = 0;
         return;
       }
-      const enter = clamp01(t / FADE);
+      if (!sc.shown && t > sc.in0 - 0.25) {
+        sc.shown = true;
+        sc.reveals.forEach((r) => r.classList.add("in"));
+      }
+      const enter = clamp01((t - sc.in0) / sc.inl);
       const exit = sc.last ? 1 : clamp01((sc.R - t) / FADE);
       const vis = smooth(Math.min(enter, exit));
       sc.vis = vis;
@@ -268,12 +279,8 @@
       if (key === sc.key) return;
       sc.key = key;
       sc.ty = look(sc.inner, vis, dir, sc.fit);
-      if (vis > 0.02 && !sc.shown) {
-        sc.shown = true;
-        sc.reveals.forEach((r) => r.classList.add("in"));
-      }
       if (sc.steps.length > 1) {
-        const s = t - FADE;
+        const s = t - sc.in0 - sc.inl;
         let best = 0, bestV = -1;
         sc.steps.forEach((st, i) => {
           const start = i * (HOLD + XFADE);
@@ -291,10 +298,17 @@
     // the card: hidden until it fills the screen (the intro's veil shows its background meanwhile),
     // a slow zoom while you read, and the pearl flowers blooming in once it is in place
     const top = cardTop - y;
+    const tc = -top / unit;                                           // screens since the card reached the top
+    const veil = smooth(clamp01(tc / 0.6));
+    if (veil !== lastVeil) { lastVeil = veil; cardLayers.forEach((l) => (l.style.opacity = veil.toFixed(3))); }
     const prog = clamp01(-top / Math.max(1, cardH - vh));
-    card.style.visibility = top > 0.5 ? "hidden" : "";
     fitEl.style.setProperty("--zoom", (1 + prog * 0.07).toFixed(4));
-    const ease = 1 - Math.pow(1 - clamp01(-top / (vh * 0.2)), 3);
+    const ease = 1 - Math.pow(1 - clamp01((tc - 0.25) / 0.45), 3);
+    // the opening scene's own butterflies: in once the mandap is revealed, out as the card takes over
+    if (stageFly) {
+      const pi = clamp01((y - introTop) / Math.max(1, cardTop - introTop));
+      stageFly.show(clamp01((pi - 0.5) / 0.1) * (1 - veil));
+    }
     const bloom = (0.6 + 0.4 * ease).toFixed(4);
     flTL.style.scale = flBR.style.scale = bloom;
     flTL.style.opacity = flBR.style.opacity = ease.toFixed(3);
@@ -313,9 +327,8 @@
   if (document.fonts) document.fonts.ready.then(measure);
   measure();
 
-  /* ---------- 7. golden butterflies drifting over the card */
-  const flutter = $("#flutter");
-  if (!reduce && flutter) {
+  /* ---------- 7. golden butterflies: a pair over the card, and a pair over the opening scene */
+  function flock(box, n, prefix) {
     const wing = (id) => `
       <g class="wing">
         <path d="M0 -3C-8 -27 -36 -33 -37 -14C-38 -3 -19 1 0 0Z" fill="url(#${id})" stroke="#7a5a22" stroke-width=".7"/>
@@ -323,10 +336,10 @@
         <path d="M-4 -4C-14 -14 -24 -19 -31 -15M-3 3C-11 8 -18 14 -21 22" stroke="#7a5a22" stroke-width=".5" fill="none" opacity=".6"/>
         <circle cx="-26" cy="-17" r="2.2" fill="#fff4d6" opacity=".7"/>
       </g>`;
-    const flies = [0, 1].map((n) => {
-      const id = `bwg${n}`;
+    const flies = Array.from({ length: n }, (_, i) => {
+      const id = `${prefix}${i}`;
       const b = el("div", "bfly");
-      b.style.setProperty("--flap", `${0.24 + n * 0.07}s`);
+      b.style.setProperty("--flap", `${0.24 + i * 0.07}s`);
       b.innerHTML = `<svg viewBox="-40 -36 80 66" aria-hidden="true">
         <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#f4dea4"/><stop offset=".5" stop-color="#cfa955"/><stop offset="1" stop-color="#8e6b2b"/>
@@ -336,13 +349,14 @@
         <ellipse cx="0" cy="3" rx="1.9" ry="11" fill="#5b4220"/>
         <path d="M0 -7C-2 -15 -6 -20 -9 -23M0 -7C2 -15 6 -20 9 -23" stroke="#5b4220" stroke-width=".8" fill="none"/>
       </svg>`;
-      flutter.append(b);
-      return { b, s: Math.random() * 100, k: 0.55 + n * 0.25, size: 0.62 + n * 0.12, px: 0, py: 0, ang: 0 };
+      box.append(b);
+      return { b, s: Math.random() * 100, k: 0.55 + i * 0.25, size: 0.62 + i * 0.12, px: 0, py: 0, ang: 0 };
     });
-    let run = false, raf = 0, t0 = performance.now();
-    function flutterFrame(now) {
+    let run = false, raf = 0, shown = -1;
+    const t0 = performance.now();
+    function step(now) {
       const t = (now - t0) / 1000;
-      const w = flutter.clientWidth, h = flutter.clientHeight;
+      const w = box.clientWidth, h = box.clientHeight;
       flies.forEach((f) => {
         const tt = t * f.k * 0.35 + f.s;
         const x = w * (0.5 + 0.42 * Math.sin(tt * 0.9) * Math.cos(tt * 0.37 + f.s));
@@ -350,18 +364,34 @@
         const dx = x - f.px, dy = y - f.py;
         if (dx * dx + dy * dy > 0.01) {
           const a = Math.atan2(dy, dx) * 180 / Math.PI + 90;
-          let diff = ((a - f.ang + 540) % 360) - 180;
+          const diff = ((a - f.ang + 540) % 360) - 180;
           f.ang += diff * 0.08;
         }
         f.px = x; f.py = y;
         f.b.style.transform = `translate(${x - 23}px, ${y - 18}px) rotate(${f.ang.toFixed(1)}deg) scale(${f.size})`;
       });
-      if (run) raf = requestAnimationFrame(flutterFrame);
+      if (run) raf = requestAnimationFrame(step);
     }
-    new IntersectionObserver(([en]) => {
-      if (en.isIntersecting && !run) { run = true; raf = requestAnimationFrame(flutterFrame); }
-      else if (!en.isIntersecting) { run = false; cancelAnimationFrame(raf); }
-    }).observe(card);
+    const go = (on) => {
+      if (on && !run) { run = true; raf = requestAnimationFrame(step); }
+      else if (!on && run) { run = false; cancelAnimationFrame(raf); }
+    };
+    return {
+      go,
+      show(v) {                                  // fade the flock in/out and only animate while it can be seen
+        if (v === shown) return;
+        shown = v;
+        box.style.opacity = v.toFixed(3);
+        go(v > 0.001);
+      },
+    };
+  }
+
+  if (!reduce) {
+    const cardFly = flock($("#flutter"), 2, "bwg");
+    new IntersectionObserver(([en]) => cardFly.go(en.isIntersecting)).observe(card);
+    stageFly = flock($("#stageFlutter"), 2, "bws");
+    frame();
   }
 
 })();

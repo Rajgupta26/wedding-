@@ -10,8 +10,8 @@
   const intro = $("#home"), stage = $("#stage"), frameEl = $("#frame");
   const canvas = $("#introCanvas"), ctx = canvas.getContext("2d");
   const video = $("#introLoop"), cover = $("#introCover"), next = $("#introNext"), haze = $("#introHaze");
-  const veil = $("#introVeil");
   const sub = $(".t-sub"), name1 = $(".t-name--1"), amp = $(".t-amp"), name2 = $(".t-name--2");
+  const titleEl = $("#introTitle");
 
   /* ---------- timeline, as a fraction p of the pinned scroll distance
      The video runs 0→5.5s for the reveal; the slow opening drift is compressed a little for scrolling. */
@@ -83,6 +83,7 @@
       fitNames();
       document.body.classList.remove("is-loading");
       $("#loader").classList.add("done");
+      if (touch) video.querySelector("source").src = "assets/scene-loop-m.mp4";   // 1.7 MB instead of 3.7 MB
       video.preload = "auto";
       video.load();
       measure();
@@ -152,13 +153,21 @@
 
   /* ---------- loop video hand-off */
   let videoOn = false;
+  let videoBlocked = false;
   function setVideo(on) {
+    if (videoBlocked) on = false;
     if (on === videoOn) return;
     videoOn = on;
     if (on) {
       try { video.currentTime = 0; } catch { /* not ready yet */ }
       const pr = video.play();
-      if (pr && pr.catch) pr.catch(() => {});
+      if (pr && pr.catch) pr.catch(() => {               // autoplay refused: stay on the drawn scene
+        videoBlocked = true;
+        videoOn = false;
+        video.classList.remove("on");
+        lastKey = "";
+        invalidate();
+      });
       video.classList.add("on");
     } else {
       video.classList.remove("on");
@@ -172,7 +181,7 @@
     stageH = stage.offsetHeight;
     introTop = intro.getBoundingClientRect().top + scrollY;
     cardTop = cardEl.getBoundingClientRect().top + scrollY;
-    range = Math.max(1, cardTop - stageH - introTop);       // the reveal finishes just as the card starts to come in
+    range = Math.max(1, cardTop - introTop);                // the reveal finishes as the (still invisible) card reaches the top
     blurMax = frameEl.clientWidth * 0.022;
     fitNames();
     lastKey = "";
@@ -186,7 +195,7 @@
   };
 
   function render(p) {
-    const out = clamp(1 - (cardTop - scrollY) / stageH);   // 0 → 1 while the card dissolves in over the scene
+    const out = clamp((scrollY - cardTop) / stageH);        // 0 → 1 while the card dissolves in over the scene
     if (out >= 1 && covered) return;                       // hidden behind the card: nothing to update
     covered = out >= 1;
 
@@ -201,7 +210,10 @@
     // title
     letters(subL, p, SUB);
     letters(nameL, p, NAMES);
-    haze.style.opacity = clamp((p - NAMES[0]) / (NAMES[1] - NAMES[0])).toFixed(3);
+    // the opening title bows out in the first third of the hand-off, before the invitation's own names fade in
+    const keep = 1 - clamp(out / 0.3);
+    titleEl.style.opacity = keep.toFixed(3);
+    haze.style.opacity = (clamp((p - NAMES[0]) / (NAMES[1] - NAMES[0])) * keep).toFixed(3);
 
     // cover message fades as the curtains start moving
     const c = 1 - clamp(p / 0.04);
@@ -209,12 +221,11 @@
     cover.style.visibility = c <= 0 ? "hidden" : "visible";
     cover.style.transform = `translateY(${((1 - c) * 24).toFixed(1)}px)`;
 
-    next.classList.toggle("show", p > 0.975 && out < 0.15);
+    next.classList.toggle("show", p > 0.975 && out < 0.04);
 
     // the invitation card dissolves in over the scene, which drifts gently closer
     const o = out * out * (3 - 2 * out);
     frameEl.style.setProperty("--out-scale", (1 + o * 0.05).toFixed(4));
-    veil.style.opacity = o.toFixed(3);
   }
 
   function loop() {

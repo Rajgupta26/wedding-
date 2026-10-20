@@ -296,30 +296,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card {
   position: relative;
   z-index: 2;
-  margin-top: -100vh;
-  margin-top: -100lvh;
-  background: var(--cream);
+  margin-top: -200vh;
+  margin-top: -200lvh;
   overflow: clip;
 }
 
-/* The card dissolves in over the pinned scene (same framing as .card__fit), then the real card takes over. */
-.intro__veil {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  pointer-events: none;
-  background: var(--cream);
-}
-.intro__veil img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: max(100%, calc(100vh * 735 / 1200));
-  width: max(100%, calc(100lvh * 735 / 1200));
-  aspect-ratio: 735 / 1200;
-  transform: translate(-50%, -50%);
-  object-fit: cover;
-}
+/* The card's background, flowers and butterflies fade in over the pinned scene (script sets opacity). */
+.card__bg { background: var(--cream); }
+.card__bg, .card__flowers, .flutter:not(.flutter--stage) { opacity: 0; }
 
 /* Background card + a second copy that shows only the pearl flowers, sitting above the content */
 .card__bg,
@@ -337,6 +321,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card__bg { z-index: 0; }
 .card__flowers { z-index: 3; }
 .flutter { z-index: 4; }
+.flutter--stage { position: absolute; inset: 0; height: auto; margin: 0; z-index: 2; opacity: 0; }
 
 .card__fit {
   position: absolute;
@@ -374,7 +359,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   height: calc(var(--len, 2) * 100vh);
   height: calc(var(--len, 2) * 100lvh);
 }
-.sec + .sec { margin-top: -100vh; margin-top: -100lvh; }   /* the next page waits under the current one */
+.sec + .sec {   /* the next page waits under the current one; --ov lets the two cross-fade in place */
+  margin-top: calc(-100vh * (1 + var(--ov, 0)));
+  margin-top: calc(-100lvh * (1 + var(--ov, 0)));
+}
 .sec__pin {
   position: sticky;
   top: 0;
@@ -633,16 +621,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transform: translateY(28px);
   filter: blur(6px);
   transition:
-    opacity 1s ease var(--d, 0s),
-    transform 1.1s var(--ease-out) var(--d, 0s),
-    filter 1s ease var(--d, 0s);
+    opacity .7s ease var(--d, 0s),
+    transform .8s var(--ease-out) var(--d, 0s),
+    filter .7s ease var(--d, 0s);
 }
 [data-reveal].in { opacity: 1; transform: none; filter: none; }
 
 .sec [data-letters] .ltr {
   opacity: 0;
   filter: blur(9px);
-  transition: opacity .9s ease var(--ld, 0s), filter .9s ease var(--ld, 0s);
+  transition: opacity .6s ease var(--ld, 0s), filter .6s ease var(--ld, 0s);
 }
 .sec [data-letters].in .ltr { opacity: 1; filter: blur(0); }
 
@@ -661,8 +649,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Phones & tablets: same fades and movement, but no animated blur / glow (they are what make phones stutter) */
 @media (hover: none) and (pointer: coarse) {
-  [data-reveal] { filter: none; transition: opacity 1s ease var(--d, 0s), transform 1.1s var(--ease-out) var(--d, 0s); }
-  .sec [data-letters] .ltr { filter: none; transition: opacity .9s ease var(--ld, 0s); }
+  [data-reveal] { filter: none; transition: opacity .7s ease var(--d, 0s), transform .8s var(--ease-out) var(--d, 0s); }
+  .sec [data-letters] .ltr { filter: none; transition: opacity .6s ease var(--ld, 0s); }
   .bfly { filter: none; }
   .btn--glow { animation: none; box-shadow: 0 0 0 4px rgba(255, 236, 210, .35); }
 }
