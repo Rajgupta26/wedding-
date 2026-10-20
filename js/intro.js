@@ -50,12 +50,15 @@
   const essential = new Set(order.filter((i) => i % 4 === 0).concat([FR.length - 1]));
   let essentialLeft = essential.size + 1;
 
+  // Each frame is decoded once into an ImageBitmap and kept: drawing it is then a plain copy.
+  // (A plain <img> that isn't on the page gets re-decoded on every canvas draw — that was the phone lag.)
+  const toBitmap = (im) => (window.createImageBitmap ? createImageBitmap(im).catch(() => im) : im);
   function loadImg(src) {
     const im = new Image();
     im.decoding = "async";
     im.src = src;
     return (im.decode ? im.decode() : new Promise((r, j) => { im.onload = r; im.onerror = j; }))
-      .then(() => im, () => (im.complete && im.naturalWidth ? im : null));
+      .then(() => toBitmap(im), () => (im.complete && im.naturalWidth ? toBitmap(im) : null));
   }
   function progressed(isEssential) {
     loaded++;
