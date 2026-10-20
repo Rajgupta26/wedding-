@@ -20,7 +20,10 @@
   const NAMES = [0.79, 0.965];                               // names + ampersand
   const AUTOPLAY = [[0, 0], [1.8, 0.12], [5.5, 0.7], [5.9, 0.76], [7.3, 0.965], [7.9, 1]]; // seconds → p (video pacing)
 
-  let target = 0, smooth = 0, dirty = true, auto = null;
+  let target = 0, smooth = 0, dirty = true, auto = null, rafId = 0;
+  const kick = () => { if (!rafId) rafId = requestAnimationFrame(loop); };
+  const invalidate = () => { dirty = true; kick(); };
+  const cardEl = $("#card");
   video.muted = true;
 
   const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
@@ -43,7 +46,7 @@
     for (let i = 0; i < FR.length; i += stride) if (!order.includes(i)) order.push(i);
   });
   if (!order.includes(FR.length - 1)) order.splice(1, 0, FR.length - 1);
-  const essential = new Set(order.filter((i) => i % 8 === 0).concat([FR.length - 1]));
+  const essential = new Set(order.filter((i) => i % 4 === 0).concat([FR.length - 1]));
   let essentialLeft = essential.size + 1;
 
   function loadImg(src) {
@@ -58,7 +61,7 @@
     if (isEssential) essentialLeft--;
     bar.style.transform = `scaleX(${Math.min(1, (essential.size + 1 - essentialLeft) / (essential.size + 1))})`;
     lastKey = "";
-    dirty = true;
+    invalidate();
     if (essentialLeft <= 0) ready();
   }
   loadImg("assets/intro/end.webp").then((im) => { endImg = im; progressed(true); });
@@ -73,7 +76,9 @@
       fitNames();
       document.body.classList.remove("is-loading");
       $("#loader").classList.add("done");
-      dirty = true;
+      video.preload = "auto";
+      video.load();
+      measure();
     });
   }
   setTimeout(ready, 15000); // never trap the guest behind the loader
@@ -120,7 +125,6 @@
 
   function letters(list, p, [a, b]) {
     const span = b - a, each = span * 0.42;
-    const blurMax = frameEl.clientWidth * 0.022;
     for (const l of list) {
       const t = clamp((p - (a + (span - each) * l.order)) / each);
       if (t === l.t) continue;
@@ -156,29 +160,35 @@
   }
 
   /* ---------- scroll → progress */
-  let range = 1, stageH = 1, introTop = 0;
+  let range = 1, stageH = 1, introTop = 0, cardTop = 1, blurMax = 8, covered = false;
   function measure() {
     stageH = stage.offsetHeight;
     introTop = intro.getBoundingClientRect().top + scrollY;
-    range = Math.max(1, intro.offsetHeight - 2 * stageH);
+    cardTop = cardEl.getBoundingClientRect().top + scrollY;
+    range = Math.max(1, cardTop - stageH - introTop);       // the reveal finishes just as the card starts to come in
+    blurMax = frameEl.clientWidth * 0.022;
     fitNames();
     lastKey = "";
-    dirty = true;
+    covered = false;
+    invalidate();
   }
 
   const readScroll = () => {
     target = clamp((scrollY - introTop) / range);
-    dirty = true;
+    invalidate();
   };
 
   function render(p) {
+    const out = clamp(1 - (cardTop - scrollY) / stageH);   // 0 → 1 while the card dissolves in over the scene
+    if (out >= 1 && covered) return;                       // hidden behind the card: nothing to update
+    covered = out >= 1;
+
     // frames
     const src = lerpKeys(KEYS, Math.min(p, BLEND[0]));
     const endW = clamp((p - BLEND[0]) / (BLEND[1] - BLEND[0]));
     if (endW < 1 || !videoOn) draw(toIndex(src), endW);
 
     // ambient loop takes over once the reveal is complete and the stage is on screen
-    const out = clamp((scrollY - introTop - range) / stageH);
     setVideo(p >= BLEND[1] && out < 1);
 
     // title
@@ -194,14 +204,14 @@
 
     next.classList.toggle("show", p > 0.975 && out < 0.15);
 
-    // the invitation card slides up over the scene
+    // the invitation card dissolves in over the scene, which drifts gently closer
     const o = out * out * (3 - 2 * out);
     frameEl.style.setProperty("--out-scale", (1 + o * 0.05).toFixed(4));
-    frameEl.style.filter = o > 0 ? `blur(${(o * 6).toFixed(2)}px)` : "";
     veil.style.opacity = o.toFixed(3);
   }
 
   function loop() {
+    rafId = 0;
     if (auto) {
       const t = (performance.now() - auto.t0) / 1000;
       const p = lerpKeys(AUTOPLAY, auto.from + t);
@@ -217,7 +227,7 @@
       }
     }
     dirty = false;
-    requestAnimationFrame(loop);
+    if (auto || Math.abs(target - smooth) > 0.0002) kick();
   }
 
   /* ---------- "Open Invitation": plays the reveal at the video's own pace */
@@ -230,6 +240,7 @@
       from = t1;
     }
     auto = { t0: performance.now(), from };
+    kick();
   }
   const cancelAuto = () => { auto = null; };
   $("#openBtn").addEventListener("click", startAuto);
@@ -244,5 +255,5 @@
   measure();
   readScroll();
   smooth = target;
-  requestAnimationFrame(loop);
+  kick();
 })();

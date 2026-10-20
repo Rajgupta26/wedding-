@@ -149,8 +149,9 @@
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   });
 
-  /* ---------- 6. pinned pages: each section holds still in the card, fades in, (steps,) then dissolves */
-  const FADE = 0.15, HOLD = 0.5, XFADE = 0.18;   // lengths in viewport heights of scrolling
+  /* ---------- 6. pinned pages + card: each page holds still in the card, fades in, (steps,) then dissolves.
+     Per frame this only reads scrollY and cached offsets, and only writes transform/opacity — cheap on phones. */
+  const FADE = 0.15, HOLD = 0.5, XFADE = 0.18;   // lengths in screens of scrolling
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
   const smooth = (v) => v * v * (3 - 2 * v);
   const scenes = $$(".sec").map((sec, idx, all) => {
@@ -168,22 +169,35 @@
       steps[0].parentNode.after(wrap);
     }
     const n = Math.max(1, steps.length);
-    const first = idx === 0, last = idx === all.length - 1;
+    const last = idx === all.length - 1;
     const R = FADE + n * HOLD + (n - 1) * XFADE + (last ? 0 : FADE);
     sec.style.setProperty("--len", (R + 1).toFixed(3));
     return {
-      sec, pin, inner, steps, dots, n, first, last, R, fit: 1, shown: false, key: "", vis: 0,
+      idx, sec, pin, inner, steps, dots, n, last, R, fit: 1, shown: false, key: "", vis: 0, best: 0, ty: 0, docTop: 0,
       reveals: $$("[data-reveal], [data-letters], [data-draw]", inner),
     };
   });
 
-  function fitScenes() {
+  const card = $("#card");
+  const fitEl = $("#cardFit");
+  const flTL = $("#flTL"), flBR = $("#flBR");
+  // one "screen" of scrolling = 100lvh, which stays put while mobile toolbars slide in and out
+  const probe = el("div");
+  probe.style.cssText = "position:absolute;left:0;top:0;width:1px;height:100vh;height:100lvh;visibility:hidden;pointer-events:none";
+  document.body.append(probe);
+  let unit = innerHeight, cardTop = 0, cardH = 1;
+
+  function measure() {
+    unit = probe.offsetHeight || innerHeight;
+    cardTop = card.getBoundingClientRect().top + scrollY;
+    cardH = card.offsetHeight;
     scenes.forEach((sc) => {
-      const avail = sc.pin.clientHeight * 0.7;    // keep clear of the corner flowers
-      sc.fit = Math.min(1, avail / Math.max(1, sc.inner.offsetHeight));
+      sc.docTop = sc.sec.getBoundingClientRect().top + scrollY;
+      sc.fit = Math.min(1, (sc.pin.clientHeight * 0.7) / Math.max(1, sc.inner.offsetHeight));   // clear of the corner flowers
       sc.key = "";
     });
-    renderScenes();
+    roomKey = "";
+    frame();
   }
 
   function look(node, vis, dir, fit) {
@@ -191,16 +205,51 @@
     const y = (1 - vis) * 26 * dir;
     node.style.opacity = vis.toFixed(3);
     node.style.transform = `translateY(${y.toFixed(1)}px)` + (fit !== undefined ? ` scale(${fit.toFixed(4)})` : "");
-    node.style.filter = reduce || vis >= 1 ? "none" : `blur(${((1 - vis) * 7).toFixed(2)}px)`;
     node.classList.toggle("off", vis <= 0.001);
+    return y;
   }
 
-  function renderScenes() {
-    const vh = innerHeight;
+  // Where a page actually has ink: each text line, plus solid boxes (medallions, cards, buttons).
+  function inkRects(root) {
+    const out = [];
+    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.nodeValue.trim() && !n.parentElement.closest(".off") ? 1 : 2),
+    });
+    const range = document.createRange();
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      range.selectNodeContents(n);
+      out.push(...range.getClientRects());
+    }
+    $$(".medallion, .event:not(.off), .countdown > div, .btn, .divider", root).forEach((e) => out.push(e.getBoundingClientRect()));
+    return out;
+  }
+  // How far each corner flower must move so none of that ink sits under it — measured once per page / event card.
+  const push = { tl: 0, br: 0 };
+  let roomKey = "";
+  function flowerRoom(sc) {
+    const host = flBR.parentElement.getBoundingClientRect();
+    const br = { left: host.left + flBR.offsetLeft + flBR.offsetWidth * 0.12, top: host.top + flBR.offsetTop + flBR.offsetHeight * 0.1 };
+    const tl = { right: host.left + flTL.offsetLeft + flTL.offsetWidth * 0.88, bottom: host.top + flTL.offsetTop + flTL.offsetHeight * 0.9 };
+    let pTL = 0, pBR = 0;
+    for (const r of inkRects(sc.inner)) {
+      if (!r.width || !r.height) continue;
+      const top = r.top - sc.ty, bottom = r.bottom - sc.ty;   // where it will rest once the fade settles
+      if (r.right > br.left && bottom > br.top) pBR = Math.max(pBR, bottom - br.top + 14);
+      if (r.left < tl.right && top < tl.bottom) pTL = Math.max(pTL, tl.bottom - top + 14);
+    }
+    push.tl = Math.min(pTL, flTL.offsetHeight * 0.7);
+    push.br = Math.min(pBR, flBR.offsetHeight * 0.7);
+  }
+
+  let raf = 0;
+  function frame() {
+    raf = 0;
+    const y = scrollY, vh = innerHeight;
+    let lead = null;
+
     scenes.forEach((sc) => {
-      const top = sc.sec.getBoundingClientRect().top;
-      const t = -top / vh;                                         // viewport heights since this page pinned
-      if (t < -1.2 || t > sc.R + 1.2) {                              // far away: keep hidden, skip work
+      const t = (y - sc.docTop) / unit;                             // screens since this page pinned
+      if (t < -1.2 || t > sc.R + 1.2) {                             // far away: keep hidden, skip work
         if (sc.key !== "off") { look(sc.inner, 0, 1, sc.fit); sc.key = "off"; }
         sc.vis = 0;
         return;
@@ -209,11 +258,12 @@
       const exit = sc.last ? 1 : clamp01((sc.R - t) / FADE);
       const vis = smooth(Math.min(enter, exit));
       sc.vis = vis;
+      if (vis > 0.05 && (!lead || vis > lead.vis)) lead = sc;
       const dir = enter < 1 ? 1 : exit < 1 ? -1 : 0;
       const key = vis.toFixed(3) + dir + sc.fit + (sc.steps.length > 1 ? t.toFixed(3) : "");
       if (key === sc.key) return;
       sc.key = key;
-      look(sc.inner, vis, dir, sc.fit);
+      sc.ty = look(sc.inner, vis, dir, sc.fit);
       if (vis > 0.02 && !sc.shown) {
         sc.shown = true;
         sc.reveals.forEach((r) => r.classList.add("in"));
@@ -229,83 +279,37 @@
           look(st, v, vin < 1 ? 1 : vout < 1 ? -1 : 0);
           if (v > bestV) { bestV = v; best = i; }
         });
+        sc.best = best;
         sc.dots.forEach((d, i) => d.classList.toggle("on", i === best));
       }
     });
-  }
 
-  let sRaf = 0;
-  addEventListener("scroll", () => { if (!sRaf) sRaf = requestAnimationFrame(() => { sRaf = 0; renderScenes(); }); }, { passive: true });
-  addEventListener("resize", fitScenes);
-  fitScenes();
-  if (document.fonts) document.fonts.ready.then(fitScenes);
-
-  /* ---------- 7. card parallax zoom + flowers */
-  const card = $("#card");
-  const fit = $("#cardFit");
-  const flTL = $("#flTL"), flBR = $("#flBR");
-  let ticking = false;
-
-  // Where the visible page actually has ink: each text line, plus solid boxes (medallions, cards, buttons).
-  function inkRects(root) {
-    const out = [];
-    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => (n.nodeValue.trim() && !n.parentElement.closest(".off") ? 1 : 2),
-    });
-    const range = document.createRange();
-    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-      range.selectNodeContents(n);
-      out.push(...range.getClientRects());
-    }
-    $$(".medallion, .event:not(.off), .countdown > div, .btn, .divider", root).forEach((e) => out.push(e.getBoundingClientRect()));
-    return out;
-  }
-  // How far each corner flower has to move so none of that ink sits underneath it.
-  const push = { tl: 0, br: 0 };
-  function flowerRoom(inner) {
-    const host = flBR.parentElement.getBoundingClientRect();
-    const br = { left: host.left + flBR.offsetLeft + flBR.offsetWidth * 0.12, top: host.top + flBR.offsetTop + flBR.offsetHeight * 0.1 };
-    const tl = { right: host.left + flTL.offsetLeft + flTL.offsetWidth * 0.88, bottom: host.top + flTL.offsetTop + flTL.offsetHeight * 0.9 };
-    let pTL = 0, pBR = 0;
-    for (const r of inkRects(inner)) {
-      if (!r.width || !r.height) continue;
-      if (r.right > br.left && r.bottom > br.top) pBR = Math.max(pBR, r.bottom - br.top + 14);
-      if (r.left < tl.right && r.top < tl.bottom) pTL = Math.max(pTL, tl.bottom - r.top + 14);
-    }
-    push.tl = Math.min(pTL, flTL.offsetHeight * 0.7);
-    push.br = Math.min(pBR, flBR.offsetHeight * 0.7);
-  }
-  function onScroll() {
-    ticking = false;
-    const vh = innerHeight;
-    const r = card.getBoundingClientRect();
-    const prog = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - vh)));
-    fit.style.setProperty("--zoom", (1 + prog * 0.07).toFixed(4));
-
-    // the card is invisible until it fills the screen (the intro's veil shows its background meanwhile)
-    card.style.visibility = r.top > 0.5 ? "hidden" : "";
-    // flowers bloom in once the card is in place, then drift apart slightly with scroll
-    const bloom = Math.min(1, Math.max(0, -r.top / (vh * 0.2)));
-    const ease = 1 - Math.pow(1 - bloom, 3);
-    const s = (0.6 + 0.4 * ease).toFixed(4);
-    const drift = Math.sin(prog * Math.PI * 6) * 5;
-    flTL.style.scale = s;
-    flBR.style.scale = s;
+    // the card: hidden until it fills the screen (the intro's veil shows its background meanwhile),
+    // a slow zoom while you read, and the pearl flowers blooming in once it is in place
+    const top = cardTop - y;
+    const prog = clamp01(-top / Math.max(1, cardH - vh));
+    card.style.visibility = top > 0.5 ? "hidden" : "";
+    fitEl.style.setProperty("--zoom", (1 + prog * 0.07).toFixed(4));
+    const ease = 1 - Math.pow(1 - clamp01(-top / (vh * 0.2)), 3);
+    const bloom = (0.6 + 0.4 * ease).toFixed(4);
+    flTL.style.scale = flBR.style.scale = bloom;
     flTL.style.opacity = flBR.style.opacity = ease.toFixed(3);
-    // flowers step aside while the current page's text would run underneath them (kept between pages)
-    let lead = null;
-    scenes.forEach((sc) => { if (sc.vis > 0.05 && (!lead || sc.vis > lead.vis)) lead = sc; });
-    if (lead) flowerRoom(lead.inner);
+    if (lead) {
+      const k = lead.idx + ":" + lead.best;
+      if (k !== roomKey) { roomKey = k; flowerRoom(lead); }
+    }
+    const drift = Math.sin(prog * Math.PI * 6) * 5;
     flTL.style.translate = `${(-drift).toFixed(1)}px ${(-prog * 14 - push.tl).toFixed(1)}px`;
     flBR.style.translate = `${drift.toFixed(1)}px ${(prog * 14 + push.br).toFixed(1)}px`;
   }
-  addEventListener("scroll", () => {
-    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
-  }, { passive: true });
-  addEventListener("resize", onScroll);
-  onScroll();
 
-  /* ---------- 8. golden butterflies drifting over the card */
+  addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(frame); }, { passive: true });
+  addEventListener("resize", measure);
+  addEventListener("load", measure);
+  if (document.fonts) document.fonts.ready.then(measure);
+  measure();
+
+  /* ---------- 7. golden butterflies drifting over the card */
   const flutter = $("#flutter");
   if (!reduce && flutter) {
     const wing = (id) => `
@@ -332,7 +336,7 @@
       return { b, s: Math.random() * 100, k: 0.55 + n * 0.25, size: 0.62 + n * 0.12, px: 0, py: 0, ang: 0 };
     });
     let run = false, raf = 0, t0 = performance.now();
-    function frame(now) {
+    function flutterFrame(now) {
       const t = (now - t0) / 1000;
       const w = flutter.clientWidth, h = flutter.clientHeight;
       flies.forEach((f) => {
@@ -348,10 +352,10 @@
         f.px = x; f.py = y;
         f.b.style.transform = `translate(${x - 23}px, ${y - 18}px) rotate(${f.ang.toFixed(1)}deg) scale(${f.size})`;
       });
-      if (run) raf = requestAnimationFrame(frame);
+      if (run) raf = requestAnimationFrame(flutterFrame);
     }
     new IntersectionObserver(([en]) => {
-      if (en.isIntersecting && !run) { run = true; raf = requestAnimationFrame(frame); }
+      if (en.isIntersecting && !run) { run = true; raf = requestAnimationFrame(flutterFrame); }
       else if (!en.isIntersecting) { run = false; cancelAnimationFrame(raf); }
     }).observe(card);
   }

@@ -46,8 +46,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
     content: "";
     position: fixed;
     inset: -60px;
-    background: url("../assets/scene-poster.jpg") center / cover no-repeat;
-    filter: blur(30px) saturate(.85);
+    background: url("../assets/backdrop.jpg") center / cover no-repeat;   /* pre-blurred: no live filter */
     opacity: .55;
     z-index: -1;
   }
@@ -105,7 +104,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .intro {
   position: relative;
   height: 600vh;   /* 4 screens of scrolling for the reveal + 1 for the hand-off to the card */
-  height: 600svh;
+  height: 600lvh;  /* lvh: doesn't change when a phone's address bar slides away, so nothing re-lays out */
 }
 .intro__stage {
   position: sticky;
@@ -219,9 +218,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   gap: 6px;
   padding: 10px 16px 8px;
   border-radius: 999px;
-  background: rgba(255, 250, 243, .78);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 250, 243, .9);
   box-shadow: inset 0 0 0 1px rgba(184, 147, 90, .4), 0 8px 24px rgba(70, 40, 20, .18);
   font-size: 11px;
   font-weight: 600;
@@ -295,7 +292,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: relative;
   z-index: 2;
   margin-top: -100vh;
-  margin-top: -100dvh;
+  margin-top: -100lvh;
   background: var(--cream);
   overflow: clip;
 }
@@ -370,9 +367,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: relative;
   z-index: 2;
   height: calc(var(--len, 2) * 100vh);
-  height: calc(var(--len, 2) * 100dvh);
+  height: calc(var(--len, 2) * 100lvh);
 }
-.sec + .sec { margin-top: -100vh; margin-top: -100dvh; }   /* the next page waits under the current one */
+.sec + .sec { margin-top: -100vh; margin-top: -100lvh; }   /* the next page waits under the current one */
 .sec__pin {
   position: sticky;
   top: 0;
@@ -390,7 +387,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   text-align: center;
   transform-origin: 50% 50%;
-  will-change: transform, opacity, filter;
 }
 .sec__inner > * { margin: 0; }
 .sec__inner.off { visibility: hidden; }
@@ -536,7 +532,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* events */
 .events { display: grid; width: 100%; }
-.events > .event { grid-area: 1 / 1; will-change: transform, opacity, filter; }   /* one card at a time, same spot */
+.events > .event { grid-area: 1 / 1; }   /* one card at a time, same spot */
 .events > .event.off { visibility: hidden; }
 .step-dots { display: flex; justify-content: center; gap: 8px; margin-top: 18px !important; }
 .step-dots i {
