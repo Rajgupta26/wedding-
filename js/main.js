@@ -160,9 +160,9 @@
     s.style.setProperty("--t", t.toFixed(3));
     parent.append(s);
   }
-  // the opening plays in steps: closed curtains, curtains open, mandap complete, full title
-  // (its reveal spans 4 screens; intro.js maps that to progress 0 → 1)
-  [0, 0.4, 0.72, 1].forEach((p) => addStop($("#home"), p * 4));
+  // the opening plays in even steps about half a screen apart, so every normal swipe moves it on one step
+  // (its reveal spans 4 screens; intro.js maps that to progress 0 → 1; the last stop is the full title)
+  [0, 0.14, 0.28, 0.42, 0.56, 0.7, 0.85, 1].forEach((p) => addStop($("#home"), p * 4));
   document.documentElement.style.setProperty("--ov", FADE);      // CSS overlap between consecutive pages
   const scenes = $$(".sec").map((sec, idx, all) => {
     const pin = el("div", "sec__pin"), inner = el("div", "sec__inner");
@@ -185,7 +185,7 @@
     const R = in0 + inl + n * HOLD + (n - 1) * XFADE + (last ? 0 : FADE);
     sec.style.setProperty("--len", (R + 1).toFixed(3));
     // a stop where the page — or each event card — is fully shown and resting
-    for (let i = 0; i < n; i++) addStop(sec, in0 + inl + i * (HOLD + XFADE) + HOLD / 2);
+    for (let i = 0; i < n; i++) addStop(sec, in0 + inl + i * (HOLD + XFADE) + (idx === 0 ? 0.1 : HOLD / 2));
     return {
       idx, sec, pin, inner, steps, dots, n, last, R, in0, inl, fit: 1, shown: false, key: "", vis: 0, best: 0, ty: 0, docTop: 0,
       reveals: $$("[data-reveal], [data-letters], [data-draw]", inner),
@@ -404,5 +404,101 @@
     stageFly = flock($("#stageFlutter"), 2, "bws");
     frame();
   }
+
+  /* ---------- 8. one stop per swipe: the finger moves the page directly; a flick glides to the next stop only */
+  (() => {
+    const root = document.documentElement;
+    const maxY = () => root.scrollHeight - innerHeight;
+    const stops = () => $$(".snap").map((s) => s.getBoundingClientRect().top + scrollY).sort((a, b) => a - b);
+    let anim = 0;
+    const stopGlide = () => { if (anim) { cancelAnimationFrame(anim); anim = 0; } };
+    function glide(to) {
+      stopGlide();
+      const from = scrollY, dist = to - from;
+      if (Math.abs(dist) < 1) return;
+      const dur = reduce ? 1 : Math.min(950, 380 + Math.abs(dist) * 0.45);
+      const t0 = performance.now();
+      const ease = (k) => 1 - Math.pow(1 - k, 3);
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / dur);
+        scrollTo(0, from + dist * ease(k));
+        anim = k < 1 ? requestAnimationFrame(step) : 0;
+      };
+      anim = requestAnimationFrame(step);
+    }
+    function nextStop(pos, dir) {                      // the first stop beyond pos in the direction of travel
+      const s = stops();
+      if (!s.length) return pos;
+      if (dir > 0) return s.find((y) => y > pos + 2) ?? s[s.length - 1];
+      for (let i = s.length - 1; i >= 0; i--) if (s[i] < pos - 2) return s[i];
+      return s[0];
+    }
+    const nearestStop = (pos) => stops().reduce((b, y) => (Math.abs(y - pos) < Math.abs(b - pos) ? y : b), 0);
+
+    // touch
+    let dragging = false, sy0 = 0, fy0 = 0, samples = [];
+    document.addEventListener("touchstart", (e) => {
+      if (e.touches.length !== 1) { dragging = false; return; }
+      stopGlide();
+      dragging = true;
+      sy0 = scrollY;
+      fy0 = e.touches[0].clientY;
+      samples = [[performance.now(), fy0]];
+    }, { passive: true });
+    document.addEventListener("touchmove", (e) => {
+      if (!dragging || e.touches.length !== 1) return;    // two fingers: leave pinch-zoom alone
+      e.preventDefault();
+      const y = e.touches[0].clientY;
+      samples.push([performance.now(), y]);
+      if (samples.length > 8) samples.shift();
+      scrollTo(0, Math.max(0, Math.min(maxY(), sy0 + (fy0 - y))));
+    }, { passive: false });
+    const release = () => {
+      if (!dragging) return;
+      dragging = false;
+      const now = performance.now();
+      const recent = samples.filter(([t]) => now - t < 120);
+      let v = 0;                                           // px per ms, + = forward (finger moving up)
+      if (recent.length >= 2) {
+        const [ta, ya] = recent[0], [tb, yb] = recent[recent.length - 1];
+        v = (ya - yb) / Math.max(1, tb - ta);
+      }
+      if (Math.abs(v) > 0.25) {                                          // flick → one stop on from where it started
+        const s = stops();
+        if (!s.length) return;
+        let i0 = 0;
+        s.forEach((y, i) => { if (Math.abs(y - sy0) < Math.abs(s[i0] - sy0)) i0 = i; });
+        const i = Math.max(0, Math.min(s.length - 1, i0 + Math.sign(v)));
+        glide(s[i]);
+      } else if (scrollY !== sy0) glide(nearestStop(scrollY));           // slow drag → settle on the nearest
+    };
+    document.addEventListener("touchend", release, { passive: true });
+    document.addEventListener("touchcancel", release, { passive: true });
+
+    // mouse wheel / trackpad: one stop per gesture (the rest of a trackpad's inertia is swallowed)
+    let lastWheel = 0, acc = 0, used = false;
+    addEventListener("wheel", (e) => {
+      if (e.ctrlKey) return;                              // trackpad pinch-zoom
+      e.preventDefault();
+      const now = performance.now();
+      if (now - lastWheel > 200) { acc = 0; used = false; }
+      lastWheel = now;
+      if (used || anim) return;
+      acc += e.deltaY * (e.deltaMode === 1 ? 16 : 1);
+      if (Math.abs(acc) >= 40) {
+        used = true;
+        glide(nextStop(scrollY, Math.sign(acc)));
+      }
+    }, { passive: false });
+
+    // keyboard
+    addEventListener("keydown", (e) => {
+      const map = { ArrowDown: 1, PageDown: 1, " ": e.shiftKey ? -1 : 1, ArrowUp: -1, PageUp: -1 };
+      const dir = map[e.key];
+      if (!dir || e.target.closest("input, textarea, select, button, a")) return;
+      e.preventDefault();
+      glide(nextStop(scrollY, dir));
+    });
+  })();
 
 })();

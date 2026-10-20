@@ -23,14 +23,9 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  /* every swipe stops at the next page / step, however hard you flick */
-  scroll-snap-type: y mandatory;
-}
-html.free-scroll { scroll-snap-type: none; }   /* while "Open Invitation" plays the opening */
+html { -webkit-text-size-adjust: 100%; }
 
-/* invisible stops, placed by script at the moment each page (or step) is fully shown */
+/* invisible stop markers, placed by script where each page (or step) is fully shown; the pager glides between them */
 .snap {
   position: absolute;
   left: 0;
@@ -38,8 +33,6 @@ html.free-scroll { scroll-snap-type: none; }   /* while "Open Invitation" plays 
   height: 1px;
   top: calc(var(--t) * 100vh);
   top: calc(var(--t) * 100lvh);
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
   pointer-events: none;
 }
 
@@ -89,7 +82,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: radial-gradient(ellipse at 50% 40%, #fffaf2, #efe3d3 70%);
   transition: opacity .9s ease, visibility .9s;
 }
-.loader.done { opacity: 0; visibility: hidden; }
+.loader.done { opacity: 0; visibility: hidden; pointer-events: none; }
 .loader__mono {
   font: 64px/1 var(--script);
   color: var(--ink);
@@ -401,6 +394,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .sec__inner > * { margin: 0; }
 .sec__inner.off { visibility: hidden; }
+/* pages overlap while they cross-fade: the frames themselves never catch taps, only the page that is showing */
+.sec, .sec__pin { pointer-events: none; }
+.sec__inner { pointer-events: auto; }
+.sec__inner.off, .events > .event.off { pointer-events: none; }
 
 .eyebrow {
   font-size: 12px;
