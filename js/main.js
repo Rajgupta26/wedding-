@@ -185,6 +185,10 @@
   const probe = el("div");
   probe.style.cssText = "position:absolute;left:0;top:0;width:1px;height:100vh;height:100lvh;visibility:hidden;pointer-events:none";
   document.body.append(probe);
+  const probeS = probe.cloneNode();                      // 100svh: the screen height with the address bar showing
+  probeS.style.height = "100vh";
+  probeS.style.height = "100svh";
+  document.body.append(probeS);
   let unit = innerHeight, cardTop = 0, cardH = 1;
 
   function measure() {
@@ -193,7 +197,7 @@
     cardH = card.offsetHeight;
     scenes.forEach((sc) => {
       sc.docTop = sc.sec.getBoundingClientRect().top + scrollY;
-      sc.fit = Math.min(1, (sc.pin.clientHeight * 0.7) / Math.max(1, sc.inner.offsetHeight));   // clear of the corner flowers
+      sc.fit = Math.min(1, ((probeS.offsetHeight || innerHeight) * 0.7) / Math.max(1, sc.inner.offsetHeight));   // clear of the corner flowers
       sc.key = "";
     });
     roomKey = "";
