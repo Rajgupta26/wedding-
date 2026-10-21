@@ -240,25 +240,34 @@
   })();
 
 
-  // RSVP: the car drives in with the page scroll and comes to a gentle stop exactly at the bottom of the page
+  // RSVP: the car drives in with the page scroll and comes to a gentle stop exactly at the bottom of the page.
+  // Positions are measured once (and on resize/load); each scroll frame only reads scrollY and sets one transform.
   (() => {
     const fig = $("#rsvp"), car = $("#rsvpCar");
     if (!fig || !car) return;
-    let ticking = false;
+    let y0 = 0, y1 = 1, carW = 0, ticking = false;
+    function measureCar() {
+      const vh = innerHeight, figTop = fig.getBoundingClientRect().top + scrollY;
+      y1 = document.documentElement.scrollHeight - vh;                 // scroll position at the very bottom
+      y0 = Math.min(y1 - 1, figTop - vh + fig.offsetHeight * 0.66);    // starts as the carpet comes into view
+      carW = car.offsetWidth;
+      drive();
+    }
     function drive() {
       ticking = false;
-      const vh = innerHeight, top = fig.getBoundingClientRect().top;
-      const endTop = top + scrollY - (document.documentElement.scrollHeight - vh);   // where it sits at the very bottom
-      const startTop = vh - fig.offsetHeight * 0.66;                               // begins as the carpet (where the car parks) comes into view
-      const p = clamp01((startTop - top) / Math.max(1, startTop - endTop));
-      const e = 1 - Math.pow(1 - p, 2.2);                                          // eases to a gentle stop
-      const x = (1 - e) * 110;                                                     // % of its own width, off to the right
-      const bob = Math.sin(p * 38) * (1 - e) * 0.6;                                // a little road bounce while moving
-      car.style.transform = `translate(${x.toFixed(2)}%, ${bob.toFixed(2)}%)`;
+      const p = clamp01((scrollY - y0) / (y1 - y0));
+      const e = 1 - Math.pow(1 - p, 2.2);
+      const x = (1 - e) * 1.1 * carW;
+      const bob = Math.sin(p * 38) * (1 - e) * 2;
+      car.style.transform = `translate3d(${x.toFixed(1)}px, ${bob.toFixed(1)}px, 0)`;
     }
     addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(drive); } }, { passive: true });
-    addEventListener("resize", drive);
-    drive();
+    addEventListener("resize", measureCar);
+    addEventListener("load", measureCar);
+    car.addEventListener("load", measureCar);
+    $$("#after img").forEach((i) => i.addEventListener("load", measureCar));
+    if (window.ResizeObserver) new ResizeObserver(measureCar).observe(document.body);   // any later layout change
+    measureCar();
   })();
 
 

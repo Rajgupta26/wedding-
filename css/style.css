@@ -743,7 +743,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .rsvp__car {
   position: absolute; left: 3%; top: 64%; width: 95%; height: auto;
   will-change: transform;
-  transform: translateX(110%);
+  transform: translate3d(110%, 0, 0);
+  backface-visibility: hidden;
 }
 
 /* Wedding: living flames over the havan kund */
