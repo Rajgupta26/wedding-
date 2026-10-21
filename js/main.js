@@ -50,295 +50,49 @@
     });
   });
 
-  /* ---------- 3. build dynamic sections */
-  const [, y, mo, d] = W.date.match(/^(\d{4})-(\d{2})-(\d{2})/) || [];
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  if (y) {
-    const wd = new Date(Date.UTC(+y, +mo - 1, +d)).getUTCDay();
-    const big = $("#bigDate");
-    big.append(el("span", null, days[wd]), el("b", null, d), el("span", null, `${months[+mo - 1]} ${y}`));
-  }
-
-  const evList = $("#eventList");
-  W.events.forEach((ev, i) => {
-    const card = el("article", "event");
-    card.dataset.step = "";
-    card.append(
-      el("h3", null, ev.title),
-      el("p", "sub", ev.subtitle),
-      el("p", "row", ev.date || W.dateLabel),
-      el("p", "row time", `${ev.time} ${W.timezoneLabel || ""}`.trim()),
-      el("p", "row venue", ev.venue),
-      el("p", "row addr", ev.address)
-    );
-    if (ev.map) {
-      const a = el("a", "btn btn--small");
-      a.href = ev.map;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>';
-      a.append("Open Map");
-      card.append(a);
-    }
-    evList.append(card);
-  });
-
-  const tl = $("#timeline");
-  W.story.forEach((s) => {
-    const li = el("li");
-    li.dataset.reveal = "";
-    li.append(el("span", "yr", s.year), el("h3", null, s.title), el("p", null, s.text));
-    tl.append(li);
-  });
-
-  /* ---------- 4. countdown */
-  const target = new Date(W.date).getTime();
-  const cd = {};
-  $$("[data-cd]").forEach((b) => (cd[b.dataset.cd] = b));
-  const pad = (n) => String(n).padStart(2, "0");
-  function tick() {
-    let s = Math.max(0, Math.floor((target - Date.now()) / 1000));
-    if (s === 0) {
-      const box = $("#countdown");
-      box.classList.add("ended");
-      box.textContent = "The celebration has begun — thank you for being part of our day.";
-      return false;
-    }
-    const v = { d: Math.floor(s / 86400), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
-    for (const k in v) {
-      const txt = k === "d" ? String(v[k]).padStart(2, "0") : pad(v[k]);
-      if (cd[k].textContent !== txt) {
-        cd[k].textContent = txt;
-        if (!reduce) {
-          cd[k].classList.remove("tick");
-          void cd[k].offsetWidth;
-          cd[k].classList.add("tick");
-        }
-      }
-    }
-    return true;
-  }
-  if (tick()) {
-    const iv = setInterval(() => { if (!tick()) clearInterval(iv); }, 1000);
-  }
-
-  /* ---------- 5. add to calendar (.ics) */
-  $("#calBtn").addEventListener("click", () => {
-    const start = new Date(W.date);
-    const end = new Date(start.getTime() + 6 * 3600e3);
-    const fmt = (dt) => dt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-    const esc = (s) => String(s).replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
-    const ev = W.events[W.events.length - 1] || {};
-    const ics = [
-      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Wedding Invitation//EN", "BEGIN:VEVENT",
-      `UID:${fmt(start)}-wedding@invitation`, `DTSTAMP:${fmt(new Date())}`,
-      `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-      `SUMMARY:${esc(`Wedding of ${W.bride.short} & ${W.groom.short}`)}`,
-      `LOCATION:${esc([ev.venue, ev.address].filter(Boolean).join(", "))}`,
-      `DESCRIPTION:${esc(W.events.map((e) => `${e.title}: ${e.date || W.dateLabel}, ${e.time} — ${e.venue}`).join("\n"))}`,
-      "END:VEVENT", "END:VCALENDAR",
-    ].join("\r\n");
-    const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
-    const a = el("a");
-    a.href = url;
-    a.download = `${W.bride.short}-${W.groom.short}-wedding.ics`.toLowerCase();
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  });
-
-  /* ---------- 6. pinned pages + card: each page holds still in the card, fades in, (steps,) then dissolves.
-     Per frame this only reads scrollY and cached offsets, and only writes transform/opacity — cheap on phones. */
-  const FADE = 0.15, HOLD = 0.5, XFADE = 0.18;   // lengths in screens of scrolling
+  /* ---------- 3. after the opening: the area for the new images fades in over the scene */
   const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
   const smooth = (v) => v * v * (3 - 2 * v);
-  function addStop(parent, t) {                                 // t = screens from the top of parent
+  const card = $("#card"), after = $("#after"), introEl = $("#home");
+  function addStop(parent, t) {
     const s = el("i", "snap");
     s.setAttribute("aria-hidden", "true");
     s.style.setProperty("--t", t.toFixed(3));
     parent.append(s);
   }
-  // the opening plays in even steps about half a screen apart, so every normal swipe moves it on one step
-  // (its reveal spans 4 screens; intro.js maps that to progress 0 → 1; the last stop is the full title)
-  [0, 0.14, 0.28, 0.42, 0.56, 0.7, 0.85, 1].forEach((p) => addStop($("#home"), p * 4));
-  document.documentElement.style.setProperty("--ov", FADE);      // CSS overlap between consecutive pages
-  const scenes = $$(".sec").map((sec, idx, all) => {
-    const pin = el("div", "sec__pin"), inner = el("div", "sec__inner");
-    inner.append(...sec.childNodes);
-    pin.append(inner);
-    sec.append(pin);
-    $$("[data-reveal]", inner).forEach((n, i) => n.style.setProperty("--d", `${(i % 4) * 0.1}s`));
-    const steps = $$("[data-step]", inner);
-    let dots = [];
-    if (steps.length > 1) {
-      const wrap = el("div", "step-dots");
-      dots = steps.map(() => el("i"));
-      wrap.append(...dots);
-      steps[0].parentNode.after(wrap);
-    }
-    const n = Math.max(1, steps.length);
-    const last = idx === all.length - 1;
-    // the first page appears while the card dissolves in over the opening scene (screens 0.3–0.65 of the hand-off)
-    const in0 = idx === 0 ? 0.3 : 0, inl = idx === 0 ? 0.35 : FADE;
-    const R = in0 + inl + n * HOLD + (n - 1) * XFADE + (last ? 0 : FADE);
-    sec.style.setProperty("--len", (R + 1).toFixed(3));
-    // a stop where the page — or each event card — is fully shown and resting
-    for (let i = 0; i < n; i++) addStop(sec, in0 + inl + i * (HOLD + XFADE) + (idx === 0 ? 0.1 : HOLD / 2));
-    return {
-      idx, sec, pin, inner, steps, dots, n, last, R, in0, inl, fit: 1, shown: false, key: "", vis: 0, best: 0, ty: 0, docTop: 0,
-      reveals: $$("[data-reveal], [data-letters], [data-draw]", inner),
-    };
-  });
-
-  const card = $("#card");
-  const fitEl = $("#cardFit");
-  const flTL = $("#flTL"), flBR = $("#flBR");
-  const cardLayers = [$(".card__bg"), $(".card__flowers"), $("#flutter")];
-  const introEl = $("#home");
-  let introTop = 0, lastVeil = -1, stageFly = null;
-  // one "screen" of scrolling = 100lvh, which stays put while mobile toolbars slide in and out
+  // the opening plays in even steps about half a screen apart; the last stop is the full title
+  [0, 0.14, 0.28, 0.42, 0.56, 0.7, 0.85, 1].forEach((p) => addStop(introEl, p * 4));
+  // hand-off: one swipe after the title dissolves the first image in, in place, and lands on it fully shown
+  const HAND = 0.8;                                   // screens of scroll the dissolve spans
+  addStop(card, HAND);
+  let unit = innerHeight, cardTop = 0, introTop = 0, stageFly = null, raf = 0;
   const probe = el("div");
   probe.style.cssText = "position:absolute;left:0;top:0;width:1px;height:100vh;height:100lvh;visibility:hidden;pointer-events:none";
   document.body.append(probe);
-  const probeS = probe.cloneNode();                      // 100svh: the screen height with the address bar showing
-  probeS.style.height = "100vh";
-  probeS.style.height = "100svh";
-  document.body.append(probeS);
-  let unit = innerHeight, cardTop = 0, cardH = 1;
-
   function measure() {
     unit = probe.offsetHeight || innerHeight;
     cardTop = card.getBoundingClientRect().top + scrollY;
     introTop = introEl.getBoundingClientRect().top + scrollY;
-    cardH = card.offsetHeight;
-    scenes.forEach((sc) => {
-      sc.docTop = sc.sec.getBoundingClientRect().top + scrollY;
-      sc.fit = Math.min(1, ((probeS.offsetHeight || innerHeight) * 0.7) / Math.max(1, sc.inner.offsetHeight));   // clear of the corner flowers
-      sc.key = "";
-    });
-    roomKey = "";
     frame();
   }
-
-  function look(node, vis, dir, fit) {
-    // vis 0..1; dir: +1 = still arriving (sits a little low), -1 = leaving (drifts a little up)
-    const y = (1 - vis) * 26 * dir;
-    node.style.opacity = vis.toFixed(3);
-    node.style.transform = `translateY(${y.toFixed(1)}px)` + (fit !== undefined ? ` scale(${fit.toFixed(4)})` : "");
-    node.classList.toggle("off", vis <= 0.001);
-    return y;
-  }
-
-  // Where a page actually has ink: each text line, plus solid boxes (medallions, cards, buttons).
-  function inkRects(root) {
-    const out = [];
-    const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => (n.nodeValue.trim() && !n.parentElement.closest(".off") ? 1 : 2),
-    });
-    const range = document.createRange();
-    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-      range.selectNodeContents(n);
-      out.push(...range.getClientRects());
-    }
-    $$(".medallion, .event:not(.off), .countdown > div, .btn, .divider", root).forEach((e) => out.push(e.getBoundingClientRect()));
-    return out;
-  }
-  // How far each corner flower must move so none of that ink sits under it — measured once per page / event card.
-  const push = { tl: 0, br: 0 };
-  let roomKey = "";
-  function flowerRoom(sc) {
-    const host = flBR.parentElement.getBoundingClientRect();
-    const br = { left: host.left + flBR.offsetLeft + flBR.offsetWidth * 0.12, top: host.top + flBR.offsetTop + flBR.offsetHeight * 0.1 };
-    const tl = { right: host.left + flTL.offsetLeft + flTL.offsetWidth * 0.88, bottom: host.top + flTL.offsetTop + flTL.offsetHeight * 0.9 };
-    let pTL = 0, pBR = 0;
-    for (const r of inkRects(sc.inner)) {
-      if (!r.width || !r.height) continue;
-      const top = r.top - sc.ty, bottom = r.bottom - sc.ty;   // where it will rest once the fade settles
-      if (r.right > br.left && bottom > br.top) pBR = Math.max(pBR, bottom - br.top + 14);
-      if (r.left < tl.right && top < tl.bottom) pTL = Math.max(pTL, tl.bottom - top + 14);
-    }
-    push.tl = Math.min(pTL, flTL.offsetHeight * 0.7);
-    push.br = Math.min(pBR, flBR.offsetHeight * 0.7);
-  }
-
-  let raf = 0;
   function frame() {
     raf = 0;
-    const y = scrollY, vh = innerHeight;
-    let lead = null;
-
-    scenes.forEach((sc) => {
-      const t = (y - sc.docTop) / unit;                             // screens since this page pinned
-      if (t < -1.2 || t > sc.R + 1.2) {                             // far away: keep hidden, skip work
-        if (sc.key !== "off") { look(sc.inner, 0, 1, sc.fit); sc.key = "off"; }
-        sc.vis = 0;
-        return;
-      }
-      if (!sc.shown && t > sc.in0 - 0.25) {
-        sc.shown = true;
-        sc.reveals.forEach((r) => r.classList.add("in"));
-      }
-      const enter = clamp01((t - sc.in0) / sc.inl);
-      const exit = sc.last ? 1 : clamp01((sc.R - t) / FADE);
-      const vis = smooth(Math.min(enter, exit));
-      sc.vis = vis;
-      if (vis > 0.05 && (!lead || vis > lead.vis)) lead = sc;
-      const dir = enter < 1 ? 1 : exit < 1 ? -1 : 0;
-      const key = vis.toFixed(3) + dir + sc.fit + (sc.steps.length > 1 ? t.toFixed(3) : "");
-      if (key === sc.key) return;
-      sc.key = key;
-      sc.ty = look(sc.inner, vis, dir, sc.fit);
-      if (sc.steps.length > 1) {
-        const s = t - sc.in0 - sc.inl;
-        let best = 0, bestV = -1;
-        sc.steps.forEach((st, i) => {
-          const start = i * (HOLD + XFADE);
-          const vin = i === 0 ? 1 : clamp01((s - (start - XFADE)) / XFADE);
-          const vout = i === sc.n - 1 ? 1 : clamp01(1 - (s - (start + HOLD)) / XFADE);
-          const v = smooth(Math.min(vin, vout));
-          look(st, v, vin < 1 ? 1 : vout < 1 ? -1 : 0);
-          if (v > bestV) { bestV = v; best = i; }
-        });
-        sc.best = best;
-        sc.dots.forEach((d, i) => d.classList.toggle("on", i === best));
-      }
-    });
-
-    // the card: hidden until it fills the screen (the intro's veil shows its background meanwhile),
-    // a slow zoom while you read, and the pearl flowers blooming in once it is in place
-    const top = cardTop - y;
-    const tc = -top / unit;                                           // screens since the card reached the top
-    const veil = smooth(clamp01(tc / 0.6));
-    if (veil !== lastVeil) { lastVeil = veil; cardLayers.forEach((l) => (l.style.opacity = veil.toFixed(3))); }
-    const prog = clamp01(-top / Math.max(1, cardH - vh));
-    fitEl.style.setProperty("--zoom", (1 + prog * 0.07).toFixed(4));
-    const ease = 1 - Math.pow(1 - clamp01((tc - 0.25) / 0.45), 3);
-    // the opening scene's own butterflies: in once the mandap is revealed, out as the card takes over
+    const y = scrollY;
+    const k = clamp01((y - cardTop) / (unit * HAND));
+    const veil = smooth(k);
+    after.style.opacity = veil.toFixed(3);
+    // hold the image still at the top of the screen while it dissolves in (it would otherwise rise from below)
+    after.style.transform = k < 1 ? `translateY(${(-(1 - k) * unit * HAND).toFixed(1)}px) scale(${(1 + 0.03 * (1 - veil)).toFixed(4)})` : "";
     if (stageFly) {
       const pi = clamp01((y - introTop) / Math.max(1, cardTop - introTop));
       stageFly.show(clamp01((pi - 0.5) / 0.1) * (1 - veil));
     }
-    const bloom = (0.6 + 0.4 * ease).toFixed(4);
-    flTL.style.scale = flBR.style.scale = bloom;
-    flTL.style.opacity = flBR.style.opacity = ease.toFixed(3);
-    if (lead) {
-      const k = lead.idx + ":" + lead.best;
-      if (k !== roomKey) { roomKey = k; flowerRoom(lead); }
-    }
-    const drift = Math.sin(prog * Math.PI * 6) * 5;
-    flTL.style.translate = `${(-drift).toFixed(1)}px ${(-prog * 14 - push.tl).toFixed(1)}px`;
-    flBR.style.translate = `${drift.toFixed(1)}px ${(prog * 14 + push.br).toFixed(1)}px`;
   }
-
   addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(frame); }, { passive: true });
   addEventListener("resize", measure);
   addEventListener("load", measure);
-  if (document.fonts) document.fonts.ready.then(measure);
-  measure();
 
-  /* ---------- 7. golden butterflies: a pair over the card, and a pair over the opening scene */
+  /* ---------- 4. golden butterflies: a pair over the card, and a pair over the opening scene */
   function flock(box, n, prefix) {
     const wing = (id) => `
       <g class="wing">
@@ -398,14 +152,243 @@
     };
   }
 
-  if (!reduce) {
-    const cardFly = flock($("#flutter"), 2, "bwg");
-    new IntersectionObserver(([en]) => cardFly.go(en.isIntersecting)).observe(card);
-    stageFly = flock($("#stageFlutter"), 2, "bws");
-    frame();
-  }
+  if (!reduce) stageFly = flock($("#stageFlutter"), 2, "bws");
 
-  /* ---------- 8. one stop per swipe: the finger moves the page directly; a flick glides to the next stop only */
+
+  // "Aditi weds Arjun": reveal its lines one after another when it scrolls into view
+  const weds = $("#weds");
+  $$(".weds__text p", weds).forEach((p, i) => p.style.setProperty("--d", `${i * 0.18}s`));
+  new IntersectionObserver(([en], io) => { if (en.isIntersecting) { weds.classList.add("in"); io.disconnect(); } }, { threshold: 0.35 }).observe(weds);
+
+
+  // Sangeet: fireworks bursting in the night sky, kept clear of the title / date / Location text
+  (() => {
+    const fig = $("#sangeet"), cv = $("#fireworks");
+    if (!fig || !cv || reduce) return;
+    const ctx = cv.getContext("2d");
+    const COLORS = [[255, 214, 120], [255, 182, 92], [255, 140, 170], [255, 240, 210], [180, 210, 255], [255, 120, 90]];
+    let w = 0, h = 0, dpr = 1, run = false, raf = 0, last = 0, nextAt = 0;
+    const rockets = [], sparks = [];
+    function size() {
+      dpr = Math.min(2, devicePixelRatio || 1);
+      w = cv.clientWidth; h = cv.clientHeight;
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    // burst spots (fractions of the sky band): the sides, and the open sky below the text
+    // open sky only: the left corner above the gate, and the right side above the arcade
+    const SPOTS = [[0.09, 0.1], [0.13, 0.31], [0.86, 0.17], [0.8, 0.36], [0.68, 0.5], [0.88, 0.5], [0.76, 0.6], [0.93, 0.28]];
+    function launch() {
+      const [fx, fy] = SPOTS[(Math.random() * SPOTS.length) | 0];
+      const tx = (fx + (Math.random() - 0.5) * 0.08) * w, ty = (fy + (Math.random() - 0.5) * 0.06) * h;
+      // launched from below the roofline, so each rocket appears from behind the palace as it climbs
+      rockets.push({ x: tx + (Math.random() - 0.5) * w * 0.06, y: h * 1.0, tx, ty, t: 0, dur: 1.1 + Math.random() * 0.4, c: COLORS[(Math.random() * COLORS.length) | 0] });
+    }
+    function burst(r) {
+      const n = 70 + ((Math.random() * 30) | 0), sp = (0.17 + Math.random() * 0.08) * w;
+      const ring = Math.random() < 0.35, c2 = COLORS[(Math.random() * COLORS.length) | 0];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.2;
+        const v = sp * (ring ? 1 : 0.35 + Math.random() * 0.75);
+        sparks.push({ x: r.tx, y: r.ty, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, decay: 0.55 + Math.random() * 0.35, c: Math.random() < 0.3 ? c2 : r.c, px: r.tx, py: r.ty });
+      }
+      sparks.push({ x: r.tx, y: r.ty, vx: 0, vy: 0, life: 1, decay: 3.2, c: [255, 250, 235], flash: true });
+    }
+    function step(now) {
+      const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+      if (now > nextAt) { launch(); if (Math.random() < 0.45) launch(); nextAt = now + 480 + Math.random() * 650; }
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = rockets.length - 1; i >= 0; i--) {
+        const r = rockets[i]; r.t += dt / r.dur;
+        const k = Math.min(1, r.t), e = 1 - Math.pow(1 - k, 2);
+        const x = r.x + (r.tx - r.x) * e, y = r.y + (r.ty - r.y) * e;
+        const [cr, cg, cb] = r.c;
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},0.8)`; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (r.tx - r.x) * 0.04, y + h * 0.05); ctx.stroke();
+        if (k >= 1) { burst(r); rockets.splice(i, 1); }
+      }
+      const g = h * 0.22;
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.life -= s.decay * dt;
+        if (s.life <= 0) { sparks.splice(i, 1); continue; }
+        const [cr, cg, cb] = s.c;
+        if (s.flash) {
+          const rad = w * 0.16 * (1.2 - s.life);
+          const gr = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, rad);
+          gr.addColorStop(0, `rgba(${cr},${cg},${cb},${0.55 * s.life})`); gr.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(s.x, s.y, rad, 0, Math.PI * 2); ctx.fill();
+          continue;
+        }
+        s.px = s.x; s.py = s.y;
+        s.vx *= 1 - 1.6 * dt; s.vy = s.vy * (1 - 1.6 * dt) + g * dt;
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        const a = Math.min(1, s.life * 1.4);
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${a})`; ctx.lineWidth = 2.8 * s.life + 0.8;
+        ctx.beginPath(); ctx.moveTo(s.px - s.vx * 0.09, s.py - s.vy * 0.09); ctx.lineTo(s.x, s.y); ctx.stroke();
+        if (Math.random() < 0.08) { ctx.fillStyle = `rgba(255,250,230,${a})`; ctx.fillRect(s.x, s.y, 1.4, 1.4); }   // twinkle
+      }
+      ctx.globalCompositeOperation = "source-over";
+      if (run) raf = requestAnimationFrame(step);
+    }
+    addEventListener("resize", size);
+    new IntersectionObserver(([en]) => {
+      if (en.isIntersecting && !run) { size(); run = true; last = 0; nextAt = 0; raf = requestAnimationFrame(step); }
+      else if (!en.isIntersecting && run) { run = false; cancelAnimationFrame(raf); rockets.length = sparks.length = 0; ctx.clearRect(0, 0, w, h); }
+    }).observe(fig);
+  })();
+
+
+  // RSVP: the car drives in with the page scroll and comes to a gentle stop exactly at the bottom of the page
+  (() => {
+    const fig = $("#rsvp"), car = $("#rsvpCar");
+    if (!fig || !car) return;
+    let ticking = false;
+    function drive() {
+      ticking = false;
+      const vh = innerHeight, top = fig.getBoundingClientRect().top;
+      const endTop = top + scrollY - (document.documentElement.scrollHeight - vh);   // where it sits at the very bottom
+      const startTop = vh - fig.offsetHeight * 0.66;                               // begins as the carpet (where the car parks) comes into view
+      const p = clamp01((startTop - top) / Math.max(1, startTop - endTop));
+      const e = 1 - Math.pow(1 - p, 2.2);                                          // eases to a gentle stop
+      const x = (1 - e) * 110;                                                     // % of its own width, off to the right
+      const bob = Math.sin(p * 38) * (1 - e) * 0.6;                                // a little road bounce while moving
+      car.style.transform = `translate(${x.toFixed(2)}%, ${bob.toFixed(2)}%)`;
+    }
+    addEventListener("scroll", () => { if (!ticking) { ticking = true; requestAnimationFrame(drive); } }, { passive: true });
+    addEventListener("resize", drive);
+    drive();
+  })();
+
+
+  // Wedding: flickering havan fire — tongues of flame, a breathing glow and rising embers
+  (() => {
+    const fig = $("#weddingFig"), cv = $("#havan");
+    if (!fig || !cv || reduce) return;
+    const ctx = cv.getContext("2d");
+    let w = 0, h = 0, run = false, raf = 0, last = 0;
+    const BX = 0.483, BY = 0.833;                 // fire base inside the canvas
+    const parts = [];
+    function size() {
+      const d = Math.min(2, devicePixelRatio || 1);
+      w = cv.clientWidth; h = cv.clientHeight;
+      cv.width = Math.round(w * d); cv.height = Math.round(h * d);
+      ctx.setTransform(d, 0, 0, d, 0, 0);
+    }
+    function spawn(ember) {
+      parts.push(ember
+        ? { x: BX * w + (Math.random() - 0.5) * w * 0.25, y: BY * h - h * 0.15, vx: (Math.random() - 0.5) * w * 0.25, vy: -h * (0.35 + Math.random() * 0.3), life: 1, decay: 0.5 + Math.random() * 0.4, r: 0.8 + Math.random() * 0.8, ember: true }
+        : { x: BX * w + (Math.random() - 0.5) * w * 0.22, y: BY * h, vx: (Math.random() - 0.5) * w * 0.12, vy: -h * (0.5 + Math.random() * 0.35), life: 1, decay: 1.6 + Math.random() * 1.0, r: w * (0.07 + Math.random() * 0.06) });
+    }
+    function step(now) {
+      const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+      const t = now / 1000;
+      for (let i = 0; i < 4; i++) spawn(false);
+      if (Math.random() < 0.12) spawn(true);
+      ctx.clearRect(0, 0, w, h);
+      // breathing glow
+      const g = 0.5 + 0.18 * Math.sin(t * 7.1) + 0.12 * Math.sin(t * 12.7);
+      const gr = ctx.createRadialGradient(BX * w, BY * h - h * 0.18, 0, BX * w, BY * h - h * 0.18, w * 0.55);
+      gr.addColorStop(0, `rgba(255,170,60,${0.35 * g})`); gr.addColorStop(1, "rgba(255,120,30,0)");
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.life -= p.decay * dt;
+        if (p.life <= 0 || p.y < 0) { parts.splice(i, 1); continue; }
+        p.x += (p.vx + Math.sin(t * 9 + p.y * 0.3) * w * 0.08) * dt; p.y += p.vy * dt;
+        if (p.ember) {
+          ctx.fillStyle = `rgba(255,${180 + 60 * p.life | 0},120,${p.life})`;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+          continue;
+        }
+        // flame tongue: white-yellow core at birth → orange → deep red as it rises and fades
+        const k = p.life, r = p.r * (0.45 + 0.55 * k);
+        const col = k > 0.75 ? [255, 214, 120] : k > 0.45 ? [255, 150, 45] : [225, 70, 25];
+        ctx.save(); ctx.translate(p.x, p.y); ctx.scale(0.62, 1.55);            // tall, narrow tongues
+        const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+        fg.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${0.42 * k})`); fg.addColorStop(1, `rgba(${col[0]},${col[1]},${col[2]},0)`);
+        ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      ctx.globalCompositeOperation = "source-over";
+      if (run) raf = requestAnimationFrame(step);
+    }
+    addEventListener("resize", size);
+    new IntersectionObserver(([en]) => {
+      if (en.isIntersecting && !run) { size(); run = true; last = 0; raf = requestAnimationFrame(step); }
+      else if (!en.isIntersecting && run) { run = false; cancelAnimationFrame(raf); parts.length = 0; }
+    }).observe(fig);
+  })();
+
+
+  // Haldi: marigold petals drifting down through the courtyard, and the diyas flickering
+  (() => {
+    const fig = $("#haldiFig"), cv = $("#haldiFx");
+    if (!fig || !cv || reduce) return;
+    const ctx = cv.getContext("2d");
+    const DIYAS = [[167, 1137, 1], [584, 1107, 1], [57, 1223, 0.7], [23, 1237, 0.7]].map(([x, y, s]) => [x / 910, y / 1729, s]);
+    const COLS = ["#f7a21b", "#f6c21c", "#ef7d12", "#ffd84a", "#fff3d6", "#e8580f"];
+    let w = 0, h = 0, run = false, raf = 0, last = 0;
+    const petals = [];
+    function size() {
+      const d = Math.min(2, devicePixelRatio || 1);
+      w = cv.clientWidth; h = cv.clientHeight;
+      cv.width = Math.round(w * d); cv.height = Math.round(h * d);
+      ctx.setTransform(d, 0, 0, d, 0, 0);
+    }
+    const petal = (y) => ({ x: Math.random() * w, y: y ?? -20, s: w * (0.016 + Math.random() * 0.014), vy: h * (0.035 + Math.random() * 0.03),
+      sway: 0.6 + Math.random() * 1.2, ph: Math.random() * 6.3, rot: Math.random() * 6.3, vr: (Math.random() - 0.5) * 3, flip: Math.random() * 6.3,
+      c: COLS[(Math.random() * COLS.length) | 0] });
+    function step(now) {
+      const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+      const t = now / 1000;
+      ctx.clearRect(0, 0, w, h);
+      // diya flames: a warm halo that breathes and a little dancing tongue on top of each painted flame
+      ctx.globalCompositeOperation = "lighter";
+      DIYAS.forEach(([fx, fy, s], i) => {
+        const x = fx * w, y = fy * h, f = 0.75 + 0.2 * Math.sin(t * 9 + i * 2) + 0.1 * Math.sin(t * 23 + i);
+        const R = w * 0.06 * s * f;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+        g.addColorStop(0, "rgba(255,190,90,0.55)"); g.addColorStop(1, "rgba(255,140,40,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R, 0, 6.3); ctx.fill();
+        const fh = w * 0.026 * s * f, fw = w * 0.008 * s, lean = Math.sin(t * 6 + i) * fw * 0.6;
+        const fg = ctx.createLinearGradient(x, y + fh * 0.3, x, y - fh);
+        fg.addColorStop(0, "rgba(255,245,200,0.9)"); fg.addColorStop(0.5, "rgba(255,180,60,0.75)"); fg.addColorStop(1, "rgba(255,90,20,0)");
+        ctx.fillStyle = fg; ctx.beginPath();
+        ctx.moveTo(x - fw, y + fh * 0.25);
+        ctx.quadraticCurveTo(x - fw * 1.1, y - fh * 0.35, x + lean, y - fh);
+        ctx.quadraticCurveTo(x + fw * 1.1, y - fh * 0.35, x + fw, y + fh * 0.25);
+        ctx.fill();
+      });
+      ctx.globalCompositeOperation = "source-over";
+      // petals
+      while (petals.length < 34) petals.push(petal(petals.length < 34 && last === now && !petals.started ? Math.random() * h : undefined));
+      petals.started = true;
+      for (const p of petals) {
+        p.y += p.vy * dt; p.ph += p.sway * dt; p.rot += p.vr * dt; p.flip += 2.2 * dt;
+        p.x += Math.sin(p.ph) * w * 0.02 * dt * 3;
+        if (p.y > h + 20) Object.assign(p, petal());
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, 0.35 + 0.65 * Math.abs(Math.cos(p.flip)));
+        ctx.fillStyle = p.c; ctx.globalAlpha = 0.92;
+        ctx.beginPath(); ctx.ellipse(0, 0, p.s, p.s * 0.62, 0, 0, 6.3); ctx.fill();
+        ctx.globalAlpha = 0.35; ctx.fillStyle = "#b8460a";
+        ctx.beginPath(); ctx.ellipse(-p.s * 0.35, 0, p.s * 0.35, p.s * 0.18, 0, 0, 6.3); ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      if (run) raf = requestAnimationFrame(step);
+    }
+    addEventListener("resize", size);
+    new IntersectionObserver(([en]) => {
+      if (en.isIntersecting && !run) { size(); run = true; last = 0; raf = requestAnimationFrame(step); }
+      else if (!en.isIntersecting && run) { run = false; cancelAnimationFrame(raf); }
+    }).observe(fig);
+  })();
+
+  measure();
+
+  /* ---------- 5. one stop per swipe: the finger moves the page directly; a flick glides to the next stop only */
   (() => {
     const root = document.documentElement;
     const maxY = () => root.scrollHeight - innerHeight;
@@ -416,9 +399,10 @@
       stopGlide();
       const from = scrollY, dist = to - from;
       if (Math.abs(dist) < 1) return;
-      const dur = reduce ? 1 : Math.min(950, 380 + Math.abs(dist) * 0.45);
+      const inHand = Math.min(from, to) >= cardTop - 2 && Math.max(from, to) <= handEnd() + 2;
+      const dur = reduce ? 1 : inHand ? 1300 : Math.min(950, 380 + Math.abs(dist) * 0.45);   // the dissolve plays slowly
       const t0 = performance.now();
-      const ease = (k) => 1 - Math.pow(1 - k, 3);
+      const ease = inHand ? (k) => k * k * (3 - 2 * k) : (k) => 1 - Math.pow(1 - k, 3);   // dissolve: gentle in and out
       const step = (now) => {
         const k = Math.min(1, (now - t0) / dur);
         scrollTo(0, from + dist * ease(k));
@@ -436,19 +420,33 @@
     const nearestStop = (pos) => stops().reduce((b, y) => (Math.abs(y - pos) < Math.abs(b - pos) ? y : b), 0);
 
     // touch
-    let dragging = false, sy0 = 0, fy0 = 0, samples = [];
+    let dragging = false, sy0 = 0, fy0 = 0, samples = [], native = false;
+    const handEnd = () => cardTop + unit * HAND;
+    // in the images: normal scrolling — except a backward swipe near the top, which pages back into the opening
+    const free = (pos, dir) => pos >= handEnd() - 2 && !(dir < 0 && pos <= handEnd() + unit * 0.5);
+    // never rest half-way through the dissolve: settle on whichever end is nearer once scrolling stops
+    let settleT = 0;
+    addEventListener("scroll", () => {
+      clearTimeout(settleT);
+      settleT = setTimeout(() => {
+        const y = scrollY, a = cardTop, b = handEnd();
+        if (!dragging && !anim && y > a + 2 && y < b - 2) glide(y - a < b - y ? a : b);
+      }, 140);
+    }, { passive: true });
     document.addEventListener("touchstart", (e) => {
       if (e.touches.length !== 1) { dragging = false; return; }
       stopGlide();
       dragging = true;
+      native = false;
       sy0 = scrollY;
       fy0 = e.touches[0].clientY;
       samples = [[performance.now(), fy0]];
     }, { passive: true });
     document.addEventListener("touchmove", (e) => {
       if (!dragging || e.touches.length !== 1) return;    // two fingers: leave pinch-zoom alone
-      e.preventDefault();
       const y = e.touches[0].clientY;
+      if (native || free(sy0, fy0 - y)) { native = true; return; }
+      e.preventDefault();
       samples.push([performance.now(), y]);
       if (samples.length > 8) samples.shift();
       scrollTo(0, Math.max(0, Math.min(maxY(), sy0 + (fy0 - y))));
@@ -456,6 +454,7 @@
     const release = () => {
       if (!dragging) return;
       dragging = false;
+      if (native) return;
       const now = performance.now();
       const recent = samples.filter(([t]) => now - t < 120);
       let v = 0;                                           // px per ms, + = forward (finger moving up)
@@ -463,6 +462,7 @@
         const [ta, ya] = recent[0], [tb, yb] = recent[recent.length - 1];
         v = (ya - yb) / Math.max(1, tb - ta);
       }
+      if (v < -0.25 && sy0 > handEnd() + 2) { glide(handEnd()); return; } // back from inside the images → top of the first image
       if (Math.abs(v) > 0.25) {                                          // flick → one stop on from where it started
         const s = stops();
         if (!s.length) return;
@@ -478,7 +478,7 @@
     // mouse wheel / trackpad: one stop per gesture (the rest of a trackpad's inertia is swallowed)
     let lastWheel = 0, acc = 0, used = false;
     addEventListener("wheel", (e) => {
-      if (e.ctrlKey) return;                              // trackpad pinch-zoom
+      if (e.ctrlKey || free(scrollY, e.deltaY)) return;   // pinch-zoom, or scrolling the images
       e.preventDefault();
       const now = performance.now();
       if (now - lastWheel > 200) { acc = 0; used = false; }
@@ -495,7 +495,7 @@
     addEventListener("keydown", (e) => {
       const map = { ArrowDown: 1, PageDown: 1, " ": e.shiftKey ? -1 : 1, ArrowUp: -1, PageUp: -1 };
       const dir = map[e.key];
-      if (!dir || e.target.closest("input, textarea, select, button, a")) return;
+      if (!dir || free(scrollY, dir) || e.target.closest("input, textarea, select, button, a")) return;
       e.preventDefault();
       glide(nextStop(scrollY, dir));
     });

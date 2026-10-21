@@ -675,3 +675,81 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .medallion::before, .loader__mono, .btn--glow, .intro__next i { animation: none; }
   .flutter { display: none; }
 }
+
+/* ---------------------------------------------------------------- after the opening (placeholder for new images) */
+.after { opacity: 0; transform-origin: 50% 0; will-change: opacity, transform; }   /* one continuous page of images */
+.card { padding-top: 80vh; padding-top: 80lvh; }   /* room for the in-place dissolve (HAND in main.js) */
+.after img { display: block; width: 100%; height: auto; }
+
+/* the images join seamlessly: each one overlaps the previous and fades in at its top edge */
+.after > * + * {
+  --ov: 3%;                                   /* slim blend where a heading sits near the top of the next image */
+  margin-top: calc(-1 * var(--ov));
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 calc(var(--ov) * 0.55));
+  mask-image: linear-gradient(to bottom, transparent, #000 calc(var(--ov) * 0.55));
+}
+/* Dear Guest → balconies: the first image is cropped at its dome base, so the dome sits straight on the balcony storey */
+/* the first three images were cut at matching rows and blended in the files themselves: no overlap needed */
+.after > :nth-child(2), .after > :nth-child(3) { margin-top: 0; -webkit-mask-image: none; mask-image: none; }
+.after > * { position: relative; }
+
+/* "Aditi weds Arjun": live text on the carpet, revealed line by line */
+.weds { margin: 0; container-type: inline-size; }
+.weds__text {
+  position: absolute;
+  left: 22%; right: 22%;
+  top: 28.96%;
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center;
+  color: #fbf1df;
+  font-family: var(--serif);
+  text-shadow: 0 2px 10px rgba(60, 0, 0, .45);
+}
+.weds__text p { margin: 0; line-height: 1.15; opacity: 0; transform: translateY(18px); filter: blur(6px);
+  transition: opacity .9s ease, transform 1s var(--ease-out), filter .9s ease; transition-delay: var(--d, 0s); }
+.weds.in .weds__text p { opacity: 1; transform: none; filter: none; }
+.weds__name {
+  font: 600 9.6cqw/1.1 "Cinzel", var(--title-serif);
+  letter-spacing: .03em;
+  background: linear-gradient(180deg, #fff3c4, #e2b150 55%, #b9832a);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: none; filter: drop-shadow(0 2px 6px rgba(60,0,0,.5));
+}
+.weds__of { font-size: 4.3cqw; font-style: italic; margin-top: 2.2cqw !important; }
+.weds__parents { font-size: 5.3cqw; font-style: italic; margin-top: .8cqw !important; }
+.weds__weds, .weds__rule { display: flex; align-items: center; gap: 3cqw; width: 100%; justify-content: center;
+  font-size: 6.2cqw; font-style: italic; margin: 3.4cqw 0 1.6cqw !important; }
+.weds__rule { font-size: 3.6cqw; font-style: normal; color: #e9bd5c; margin: 5cqw 0 4cqw !important; }
+.weds__weds span, .weds__rule span { flex: 1; max-width: 13cqw; height: 1px; background: #e2b150; }
+.weds__date { font-size: 6cqw; font-weight: 500; letter-spacing: .02em; }
+.weds__venue { font-size: 5cqw; margin-top: 2.4cqw !important; }
+@media (hover: none) and (pointer: coarse) { .weds__text p { filter: none; } }
+
+/* Sangeet: fireworks over the night sky (canvas covers the sky band only) */
+.sangeet { margin: 0; }
+.fireworks {
+  position: absolute; left: 0; top: 0; width: 100%; height: 58%;
+  pointer-events: none; mix-blend-mode: screen;
+  /* visible only over open sky: rockets rise from behind the palace and sparks fall behind its roofline */
+  -webkit-mask: url("../assets/pages/05-sky.png") 0 0 / 100% 100% no-repeat;
+  mask: url("../assets/pages/05-sky.png") 0 0 / 100% 100% no-repeat;
+}
+
+/* RSVP: scrolls like the other pages; the couple's car drives in from the right as it comes into view */
+.rsvp { margin-left: 0; margin-right: 0; margin-bottom: 0; }
+.rsvp__stage { position: relative; overflow: hidden; }
+.rsvp__frame { position: relative; width: 100%; aspect-ratio: 903 / 1742; }
+.rsvp__frame > img:first-child { width: 100%; height: 100%; }
+.rsvp__car {
+  position: absolute; left: 3%; top: 64%; width: 95%; height: auto;
+  will-change: transform;
+  transform: translateX(110%);
+}
+
+/* Wedding: living flames over the havan kund */
+.wedding { margin: 0; }
+.havan { position: absolute; left: 84.07%; top: 63.22%; width: 13.27%; height: 10.34%; pointer-events: none; mix-blend-mode: screen; }
+
+/* Haldi: drifting marigold petals and flickering diyas */
+.haldi { margin: 0; }
+.haldi__fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }

@@ -8,10 +8,10 @@
   <meta name="theme-color" content="#b08467">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=EB+Garamond:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cinzel:wght@600&family=EB+Garamond:wght@400;500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/intro/000.webp" media="(hover: hover), (pointer: fine)">
   <link rel="preload" as="image" href="assets/intro-m/000.webp" media="(hover: none) and (pointer: coarse)">
-  <link rel="stylesheet" href="css/style.css?v=17">
+  <link rel="stylesheet" href="css/style.css?v=45">
 </head>
 <body class="is-loading">
 
@@ -63,94 +63,54 @@
     </section>
 
     <!-- ============ INVITATION CARD ============ -->
+    <!-- ============ AFTER THE OPENING: your new images go here ============ -->
     <div class="card" id="card">
-      <div class="card__bg" aria-hidden="true"><div class="card__fit" id="cardFit"><img src="assets/card-clean.jpg" alt=""></div></div>
-      <div class="card__flowers" aria-hidden="true">
-        <img class="fl fl--tl" id="flTL" src="assets/flower-tl.webp" alt="">
-        <img class="fl fl--br" id="flBR" src="assets/flower-br.webp" alt="">
-      </div>
-      <div class="flutter" id="flutter" aria-hidden="true"></div>
-
-      <!-- 1. Invitation -->
-      <section class="sec sec--invite" id="invite">
-        <p class="eyebrow" data-reveal>Together with their families</p>
-        <h2 class="script script--xl" data-letters data-bind="bride.short"></h2>
-        <p class="amp" data-reveal>&amp;</p>
-        <h2 class="script script--xl" data-letters data-bind="groom.short"></h2>
-        <svg class="divider" data-draw viewBox="0 0 240 24" aria-hidden="true"><path d="M2 12h86M152 12h86M120 3c-8 0-12 9-20 9 8 0 12 9 20 9 8 0 12-9 20-9-8 0-12-9-20-9Z"/><circle cx="120" cy="12" r="2.6"/></svg>
-        <p class="lead" data-reveal>request the honour of your presence<br>at the celebration of their marriage</p>
-        <p class="date-line" data-reveal data-bind="dateLabel"></p>
-        <p class="muted" data-reveal data-bind="city"></p>
-        <blockquote class="quote" data-reveal data-bind="quote"></blockquote>
-      </section>
-
-      <!-- 2. Couple -->
-      <section class="sec sec--couple" id="couple">
-        <p class="eyebrow" data-reveal>The happy couple</p>
-        <h2 class="script script--lg" data-letters>Bride &amp; Groom</h2>
-
-        <article class="person" data-reveal>
-          <div class="medallion"><span data-bind="bride.short.0"></span></div>
-          <h3 class="person__name" data-bind="bride.full"></h3>
-          <p class="person__parents" data-bind="bride.parents"></p>
-        </article>
-
-        <p class="amp amp--big" data-reveal>&amp;</p>
-
-        <article class="person" data-reveal>
-          <div class="medallion"><span data-bind="groom.short.0"></span></div>
-          <h3 class="person__name" data-bind="groom.full"></h3>
-          <p class="person__parents" data-bind="groom.parents"></p>
-        </article>
-      </section>
-
-      <!-- 3. Save the date -->
-      <section class="sec sec--date" id="date">
-        <p class="eyebrow" data-reveal>Mark your calendar</p>
-        <h2 class="script script--lg" data-letters>Save the Date</h2>
-        <div class="bigdate" data-reveal id="bigDate"></div>
-        <div class="countdown" id="countdown" data-reveal>
-          <div><b data-cd="d">00</b><span>Days</span></div>
-          <div><b data-cd="h">00</b><span>Hours</span></div>
-          <div><b data-cd="m">00</b><span>Minutes</span></div>
-          <div><b data-cd="s">00</b><span>Seconds</span></div>
-        </div>
-        <button class="btn" id="calBtn" type="button" data-reveal>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M3.5 9h17M5 5h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 5 5Z"/></svg>
-          Add to Calendar
-        </button>
-      </section>
-
-      <!-- 4. Events -->
-      <section class="sec sec--events" id="events">
-        <p class="eyebrow" data-reveal>Join us for</p>
-        <h2 class="script script--lg" data-letters>Wedding Events</h2>
-        <div class="events" id="eventList"></div>
-      </section>
-
-      <!-- 5. Story -->
-      <section class="sec sec--story" id="story">
-        <p class="eyebrow" data-reveal>How it all began</p>
-        <h2 class="script script--lg" data-letters>Our Love Story</h2>
-        <ol class="timeline" id="timeline"></ol>
-      </section>
-
-      <!-- 6. Thank you -->
-      <section class="sec sec--thanks" id="thanks">
-        <h2 class="script script--lg" data-letters>Thank You</h2>
-        <p class="lead" data-reveal data-bind="closing"></p>
-        <svg class="divider" data-draw viewBox="0 0 240 24" aria-hidden="true"><path d="M2 12h86M152 12h86M120 3c-8 0-12 9-20 9 8 0 12 9 20 9 8 0 12-9 20-9-8 0-12-9-20-9Z"/><circle cx="120" cy="12" r="2.6"/></svg>
-        <p class="eyebrow" data-reveal>With love</p>
-        <p class="script script--md sign" data-reveal><span data-bind="bride.short"></span> &amp; <span data-bind="groom.short"></span></p>
-        <p class="hashtag" data-reveal data-bind="hashtag"></p>
+      <section class="after" id="after" aria-label="Invitation">
+        <img src="assets/pages/01.webp" alt="Dear guest — together with our families, we request the pleasure of your company to celebrate our wedding" width="906" height="1708" decoding="async">
+        <img src="assets/pages/02.webp" alt="Bride and groom" width="906" height="1508" decoding="async">
+        <figure class="weds" id="weds">
+          <img src="assets/pages/03.webp" alt="" width="906" height="1496" loading="lazy" decoding="async">
+          <div class="weds__text">
+            <p class="weds__name">Aditi</p>
+            <p class="weds__of">Daughter of</p>
+            <p class="weds__parents">Mrs. Sunita Rathore<br>&amp; Mr. Vikram Rathore</p>
+            <p class="weds__weds"><span></span>Weds<span></span></p>
+            <p class="weds__name">Arjun</p>
+            <p class="weds__of">Son of</p>
+            <p class="weds__parents">Mrs. Meera Singh<br>&amp; Mr. Rajendra Singh</p>
+            <p class="weds__rule"><span></span>&#10059;<span></span></p>
+            <p class="weds__date">20 – 21 February 2027</p>
+            <p class="weds__venue">Udaipur Marriott Hotel</p>
+          </div>
+        </figure>
+        <figure class="haldi" id="haldiFig">
+          <img src="assets/pages/04.webp" alt="Haldi — 18 February 2027, 10:00 AM onwards, The Palace Courtyard" width="910" height="1729" loading="lazy" decoding="async">
+          <canvas class="haldi__fx" id="haldiFx" aria-hidden="true"></canvas>
+        </figure>
+        <figure class="sangeet" id="sangeet">
+          <img src="assets/pages/05.webp" alt="Sangeet — 19 February 2027, 7:00 PM onwards, The Grand Darbar Hall" width="907" height="1733" loading="lazy" decoding="async">
+          <canvas class="fireworks" id="fireworks" aria-hidden="true"></canvas>
+        </figure>
+        <figure class="wedding" id="weddingFig">
+          <img src="assets/pages/06.webp" alt="Wedding — 20 February 2027, Muhurat at 5:00 PM, The Royal Mandap" width="904" height="1740" loading="lazy" decoding="async">
+          <canvas class="havan" id="havan" aria-hidden="true"></canvas>
+        </figure>
+        <figure class="rsvp" id="rsvp">
+          <div class="rsvp__stage">
+            <div class="rsvp__frame">
+              <img src="assets/pages/07.webp" alt="RSVP — We would be honoured by your presence! With love, Aditi &amp; Arjun" width="903" height="1742" loading="lazy" decoding="async">
+              <img class="rsvp__car" id="rsvpCar" src="assets/pages/07-car.webp" alt="Aditi and Arjun arriving in a vintage car" width="1100" height="727" loading="lazy" decoding="async">
+            </div>
+          </div>
+        </figure>
       </section>
     </div>
 
   </main>
 
-  <script src="js/config.js?v=17"></script>
-  <script src="js/main.js?v=17"></script>
-  <script src="js/intro-manifest.js?v=17"></script>
-  <script src="js/intro.js?v=17"></script>
+  <script src="js/config.js?v=45"></script>
+  <script src="js/main.js?v=45"></script>
+  <script src="js/intro-manifest.js?v=45"></script>
+  <script src="js/intro.js?v=45"></script>
 </body>
 </html>
