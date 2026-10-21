@@ -249,14 +249,14 @@
     function measureCar() {
       const vh = innerHeight, figTop = fig.getBoundingClientRect().top + scrollY;
       y1 = document.documentElement.scrollHeight - vh;                 // scroll position at the very bottom
-      y0 = Math.min(y1 - 1, figTop - vh + fig.offsetHeight * 0.66);    // starts as the carpet comes into view
+      y0 = Math.min(y1 - 1, figTop - vh + fig.offsetHeight * 0.2);     // starts as soon as the RSVP page comes into view (longer, slower drive)
       carW = car.offsetWidth;
       drive();
     }
     function drive() {
       ticking = false;
       const p = clamp01((scrollY - y0) / (y1 - y0));
-      const e = 1 - Math.pow(1 - p, 2.2);
+      const e = 1 - Math.pow(1 - p, 1.6);
       const x = (1 - e) * 1.1 * carW;
       const bob = Math.sin(p * 38) * (1 - e) * 2;
       car.style.transform = `translate3d(${x.toFixed(1)}px, ${bob.toFixed(1)}px, 0)`;
