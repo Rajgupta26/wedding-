@@ -753,3 +753,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Haldi: drifting marigold petals and flickering diyas */
 .haldi { margin: 0; }
 .haldi__fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* nothing may stick out sideways: on phones that would zoom the page out and leave gaps at both edges
+   (overflow: clip isn't supported by older iPhones, so the card uses hidden as well) */
+.card { overflow: hidden; overflow: clip; }
